@@ -27,13 +27,19 @@ import {
   Trash2,
   Sparkles,
   Skull,
-  ZapOff
+  ZapOff,
+  ChevronLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
 import { useCharacter } from './context/CharacterContext';
 import { CLASSES, RACES, POWERS, SPELLS, DEITIES, ITEMS, SKILLS_ATTRIBUTES } from './data/t20-data';
 import { calculateSkill } from './lib/t20-logic';
+import { CharacterCreation } from './components/CharacterCreation';
+import { PowersList } from './components/PowersList';
+import { ClassDetails, RaceDetails, OriginDetails } from './components/CompendiumDetails';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { characterService } from './lib/character';
 
 // --- Components ---
 
@@ -272,15 +278,105 @@ export default function App() {
     addItem,
     removeItem,
     levelUp,
-    levelDown
+    levelDown,
+    saveCharacter,
+    loadCharacter
   } = useCharacter();
 
-  const [activeTab, setActiveTab] = useState<'geral' | 'combate' | 'pericias' | 'inventario' | 'grimorio'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'combate' | 'pericias' | 'inventario' | 'grimorio' | 'compendio'>('geral');
+  const [compendioTab, setCompendioTab] = useState<'classes' | 'races' | 'origins' | 'powers'>('powers');
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  
   const [rollData, setRollData] = useState<{ result: number; bonus: number; isCritical: boolean; isFail: boolean } | null>(null);
   const [showAddPower, setShowAddPower] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [showAddSpell, setShowAddSpell] = useState(false);
   const [activeVFX, setActiveVFX] = useState<VFXType | null>(null);
+  
+  const [user, setUser] = useState<any>(null);
+  const [characters, setCharacters] = useState<any[]>([]);
+  const [currentCharacterId, setCurrentCharacterId] = useState<string | null>(null);
+  const [showCreation, setShowCreation] = useState(false);
+  const [loadingCharacters, setLoadingCharacters] = useState(false);
+
+  useEffect(() => {
+    // Check for active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      loadUserCharacters();
+    } else {
+      setCharacters([]);
+      setCurrentCharacterId(null);
+    }
+  }, [user]);
+
+  const loadUserCharacters = async () => {
+    if (!user) return;
+    setLoadingCharacters(true);
+    try {
+      const data = await characterService.getCharacters(user.id);
+      setCharacters(data);
+      if (data.length > 0 && !currentCharacterId) {
+        // Auto-select first character for demo
+        // In a real app, we might want a selection screen
+      }
+    } catch (error) {
+      console.error('Error loading characters:', error);
+    } finally {
+      setLoadingCharacters(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    if (!isSupabaseConfigured) {
+      alert('Configuração do Supabase não encontrada! Por favor, adicione VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no menu Settings (ícone de engrenagem).');
+      return;
+    }
+
+    // Detect if inside iframe
+    const isIframe = window.self !== window.top;
+    
+    if (isIframe) {
+      const wantsNewTab = window.confirm('O login via Google costuma ser bloqueado dentro de editores (iframes). Deseja abrir o app em uma nova aba para logar com segurança?');
+      if (wantsNewTab) {
+        window.open(window.location.href, '_blank');
+        return;
+      }
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Erro no login:', error);
+      alert(`Erro ao entrar: ${error.message || 'Verifique as configurações de Redirect URI no painel do Supabase.'}`);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+  };
+
+  const selectCharacter = async (id: string) => {
+    setCurrentCharacterId(id);
+    await loadCharacter(id);
+  };
 
   const triggerVFX = (type: VFXType) => {
     setActiveVFX(null);
@@ -317,7 +413,47 @@ export default function App() {
     { id: 'pericias', label: 'Perícias', icon: <Star size={18} /> },
     { id: 'inventario', label: 'Inventário', icon: <Backpack size={18} /> },
     { id: 'grimorio', label: 'Grimório', icon: <Book size={18} /> },
+    { id: 'compendio', label: 'Compêndio', icon: <Book size={18} /> },
   ] as const;
+
+  if (!user) {
+    return (
+      <div className="h-screen bg-gothic-bg flex items-center justify-center p-8">
+        <div className="max-w-md w-full bg-gothic-card border border-gothic-gold/20 p-12 text-center space-y-8 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+          <h1 className="font-cinzel text-4xl font-bold text-gothic-gold tracking-tighter">
+            TORMENTA <span className="text-gothic-red">20</span>
+          </h1>
+          <p className="text-gothic-text/60 font-cinzel text-sm leading-relaxed">
+            Bem-vindo ao Arthon Gothic Edition. Entre para forjar sua lenda nas terras de Arthon.
+          </p>
+          <button 
+            onClick={handleLogin}
+            className="w-full py-4 bg-gothic-gold text-gothic-bg font-cinzel font-bold tracking-widest hover:bg-white transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)]"
+          >
+            ENTRAR COM GOOGLE
+          </button>
+          {!isSupabaseConfigured && (
+            <button 
+              onClick={() => setUser({ id: 'guest', email: 'guest@arthon.com' })}
+              className="w-full py-2 border border-gothic-gold/20 text-gothic-gold/40 font-cinzel text-[10px] hover:text-gothic-gold transition-all tracking-[0.3em] uppercase"
+            >
+              Entrar como Convidado (Modo Offline)
+            </button>
+          )}
+          <p className="text-[10px] text-gothic-text/30 uppercase tracking-widest">
+            Desenvolvido para aventureiros de elite
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (showCreation) {
+    return <CharacterCreation userId={user.id} onComplete={(id) => {
+      setCurrentCharacterId(id);
+      setShowCreation(false);
+    }} />;
+  }
 
   return (
     <div className="flex h-screen bg-gothic-bg overflow-hidden selection:bg-gothic-gold/30">
@@ -332,7 +468,39 @@ export default function App() {
           </p>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-4 space-y-2 overflow-y-auto gothic-scroll">
+          <div className="mb-6">
+            <div className="flex items-center justify-between px-4 mb-2">
+              <span className="text-[9px] font-bold text-gothic-gold/40 uppercase tracking-widest">Personagens</span>
+              <button 
+                onClick={() => setShowCreation(true)}
+                className="text-gothic-gold hover:text-white transition-colors"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+            {loadingCharacters ? (
+              <div className="px-4 py-2 text-[10px] text-gothic-text/20 animate-pulse">Carregando...</div>
+            ) : characters.length === 0 ? (
+              <div className="px-4 py-2 text-[10px] text-gothic-text/20 italic">Nenhum personagem</div>
+            ) : (
+              characters.map(char => (
+                <button
+                  key={char.id}
+                  onClick={() => selectCharacter(char.id)}
+                  className={cn(
+                    "w-full text-left px-4 py-2 text-xs font-cinzel transition-all",
+                    currentCharacterId === char.id ? "text-gothic-gold bg-gothic-gold/5" : "text-gothic-text/40 hover:text-gothic-gold/60"
+                  )}
+                >
+                  {char.name}
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="h-px bg-gothic-gold/10 mx-4 mb-4" />
+
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -350,7 +518,7 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="p-6 border-t border-gothic-gold/5 bg-gothic-card/20">
+        <div className="p-6 border-t border-gothic-gold/5 bg-gothic-card/20 space-y-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-sm border border-gothic-gold/30 p-0.5">
               <img 
@@ -365,6 +533,12 @@ export default function App() {
               <p className="text-[10px] text-gothic-gold/60 italic truncate">{state.race} {state.class}</p>
             </div>
           </div>
+          <button 
+            onClick={handleLogout}
+            className="w-full py-2 border border-gothic-red/20 text-[9px] font-bold text-gothic-red/60 hover:bg-gothic-red/10 hover:text-gothic-red transition-all uppercase tracking-widest"
+          >
+            Sair de Arthon
+          </button>
         </div>
       </aside>
 
@@ -376,6 +550,12 @@ export default function App() {
             <h2 className="font-cinzel text-lg tracking-[0.2em] text-gothic-gold/80 uppercase">Painel do Personagem</h2>
           </div>
           <div className="flex items-center gap-6">
+            <button 
+              onClick={saveCharacter}
+              className="flex items-center gap-2 px-3 py-1.5 border border-gothic-gold/30 text-gothic-gold hover:bg-gothic-gold hover:text-gothic-bg transition-all font-cinzel text-[10px] font-bold uppercase tracking-widest"
+            >
+              Salvar
+            </button>
             <div className="flex items-center bg-gothic-card/50 border border-gothic-gold/20 p-1">
               <button 
                 onClick={levelDown}
@@ -775,6 +955,97 @@ export default function App() {
                 ))}
               </div>
             </section>
+          )}
+
+          {activeTab === 'compendio' && (
+            <div className="space-y-8 animate-in fade-in duration-500">
+              <div className="flex gap-4 border-b border-gothic-gold/10 pb-4">
+                {(['powers', 'classes', 'races', 'origins'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => { setCompendioTab(t); setSelectedEntityId(null); }}
+                    className={cn(
+                      "font-cinzel text-[10px] font-bold tracking-widest uppercase px-4 py-2 transition-all",
+                      compendioTab === t ? "text-gothic-gold border-b-2 border-gothic-gold" : "text-gothic-text/40 hover:text-gothic-gold"
+                    )}
+                  >
+                    {t === 'powers' ? 'Poderes' : t === 'classes' ? 'Classes' : t === 'races' ? 'Raças' : 'Origens'}
+                  </button>
+                ))}
+              </div>
+
+              {compendioTab === 'powers' && <PowersList />}
+              
+              {compendioTab === 'classes' && !selectedEntityId && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.keys(CLASSES).map(c => (
+                    <button 
+                      key={c} 
+                      onClick={() => setSelectedEntityId(c)}
+                      className="p-6 bg-gothic-card border border-gothic-gold/10 hover:border-gothic-gold/40 transition-all text-left group"
+                    >
+                      <h4 className="font-cinzel text-xl font-bold text-gothic-gold group-hover:tracking-widest transition-all">{c}</h4>
+                      <p className="text-[10px] text-gothic-text/40 mt-2 uppercase tracking-widest">Ver Detalhes</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {compendioTab === 'classes' && selectedEntityId && (
+                <div>
+                  <button onClick={() => setSelectedEntityId(null)} className="mb-4 text-gothic-gold font-cinzel text-xs flex items-center gap-2">
+                    <ChevronLeft size={14} /> VOLTAR PARA LISTA
+                  </button>
+                  <ClassDetails classId={selectedEntityId} />
+                </div>
+              )}
+
+              {compendioTab === 'races' && !selectedEntityId && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.keys(RACES).map(r => (
+                    <button 
+                      key={r} 
+                      onClick={() => setSelectedEntityId(r)}
+                      className="p-6 bg-gothic-card border border-gothic-gold/10 hover:border-gothic-gold/40 transition-all text-left group"
+                    >
+                      <h4 className="font-cinzel text-xl font-bold text-gothic-gold group-hover:tracking-widest transition-all">{r}</h4>
+                      <p className="text-[10px] text-gothic-text/40 mt-2 uppercase tracking-widest">Ver Detalhes</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {compendioTab === 'races' && selectedEntityId && (
+                <div>
+                  <button onClick={() => setSelectedEntityId(null)} className="mb-4 text-gothic-gold font-cinzel text-xs flex items-center gap-2">
+                    <ChevronLeft size={14} /> VOLTAR PARA LISTA
+                  </button>
+                  <RaceDetails raceId={selectedEntityId} />
+                </div>
+              )}
+
+              {compendioTab === 'origins' && !selectedEntityId && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Mocking origins list for now as it's not in t20-data.ts but in DB */}
+                  <div className="col-span-full p-8 text-center border border-dashed border-gothic-gold/20">
+                    <p className="font-cinzel text-gothic-text/40">Selecione uma origem para ver detalhes do banco de dados.</p>
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      {['acólito', 'artesão', 'charlatão', 'criminoso'].map(o => (
+                        <button key={o} onClick={() => setSelectedEntityId(o)} className="px-4 py-2 bg-gothic-card border border-gothic-gold/10 text-gothic-gold text-xs font-cinzel hover:border-gothic-gold transition-all">
+                          {o.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {compendioTab === 'origins' && selectedEntityId && (
+                <div>
+                  <button onClick={() => setSelectedEntityId(null)} className="mb-4 text-gothic-gold font-cinzel text-xs flex items-center gap-2">
+                    <ChevronLeft size={14} /> VOLTAR PARA LISTA
+                  </button>
+                  <OriginDetails originId={selectedEntityId} />
+                </div>
+              )}
+            </div>
           )}
         </div>
       </main>

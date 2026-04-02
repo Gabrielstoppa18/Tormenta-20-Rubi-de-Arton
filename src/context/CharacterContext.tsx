@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { calculateModifier, calculatePV, calculatePM, calculateDefesa } from '../lib/t20-logic';
 import { CLASSES, RACES, T20Power, T20Spell } from '../data/t20-data';
+import { characterService } from '../lib/character';
+import { compendiumService } from '../lib/compendium';
+import type { Character } from '../types/database';
 
 interface Attributes {
   for: number;
@@ -49,6 +52,8 @@ interface CharacterContextType {
   removeItem: (itemName: string) => void;
   levelUp: () => void;
   levelDown: () => void;
+  loadCharacter: (id: string) => Promise<void>;
+  saveCharacter: () => Promise<void>;
 }
 
 const CharacterContext = createContext<CharacterContextType | undefined>(undefined);
@@ -135,6 +140,69 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
     });
   };
 
+  const [currentCharacterId, setCurrentCharacterId] = useState<string | null>(null);
+
+  const loadCharacter = useCallback(async (id: string) => {
+    try {
+      const char = await characterService.getCharacterById(id);
+      if (!char) return;
+
+      setCurrentCharacterId(id);
+      
+      // Fetch associated data (powers, etc.)
+      const dbPowers = await characterService.getCharacterPowers(id);
+      
+      // Map DB character to context state
+      // Note: We're mapping DB IDs back to display names for now to keep existing UI working
+      // In a real app, we'd use IDs everywhere
+      setState({
+        name: char.name,
+        race: char.race_id || 'Humano',
+        class: char.class_id || 'Guerreiro',
+        level: char.level,
+        deity: 'Khalmyr', // Default for now
+        attributes: {
+          for: char.attributes_base.for || 0,
+          des: char.attributes_base.des || 0,
+          con: char.attributes_base.con || 0,
+          int: char.attributes_base.int || 0,
+          sab: char.attributes_base.sab || 0,
+          car: char.attributes_base.car || 0,
+        },
+        currentPV: char.current_hp || 0,
+        currentPM: char.current_mp || 0,
+        powers: dbPowers.map(dp => ({
+          name: dp.power?.name || 'Poder Desconhecido',
+          description: dp.power?.description || '',
+          requirements: dp.power?.requirement_text ? [dp.power.requirement_text] : []
+        })),
+        spells: [], // TODO: Fetch spells
+        inventory: [], // TODO: Fetch items
+        defenseBonus: 0,
+      });
+    } catch (error) {
+      console.error('Error loading character into context:', error);
+    }
+  }, []);
+
+  const saveCharacter = async () => {
+    if (!currentCharacterId) return;
+    try {
+      await characterService.updateCharacter(currentCharacterId, {
+        name: state.name,
+        race_id: state.race,
+        class_id: state.class,
+        level: state.level,
+        attributes_base: state.attributes,
+        current_hp: state.currentPV,
+        current_mp: state.currentPM,
+      });
+      console.log('Character saved successfully');
+    } catch (error) {
+      console.error('Error saving character:', error);
+    }
+  };
+
   return (
     <CharacterContext.Provider value={{
       state,
@@ -159,6 +227,8 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
       removeItem,
       levelUp,
       levelDown,
+      loadCharacter,
+      saveCharacter,
     }}>
       {children}
     </CharacterContext.Provider>
