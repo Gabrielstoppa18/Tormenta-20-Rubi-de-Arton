@@ -1,0 +1,65 @@
+{
+  "name": "Hera",
+  "type": "character",
+  "system": {
+    "atributos": {
+      "for": { "value": 0, "bonus": 0, "base": 14, "racial": 0 },
+      "des": { "value": 0, "bonus": 0, "base": 10, "racial": 0 },
+      "con": { "value": 0, "bonus": 0, "base": 16, "racial": 0 },
+      "int": { "value": 0, "bonus": 0, "base": 12, "racial": 0 },
+      "sab": { "value": 0, "bonus": 0, "base": 14, "racial": 0 },
+      "car": { "value": 0, "bonus": 0, "base": 20, "racial": 0 }
+    },
+    "attributes": {
+      "cd": 10,
+      "pv": { "value": 21, "min": -500, "max": 21, "temp": 0 },
+      "pm": { "value": 8, "min": 0, "max": 8, "temp": 0 },
+      "movement": { "burrow": 0, "climb": 0, "fly": 0, "swim": 0, "walk": 9, "unit": "m", "hover": false },
+      "defesa": { "base": 10, "value": 16, "outros": 0, "atributo": "des", "bonus": [], "condi": 0, "pda": 0 },
+      "sentidos": { "value": ["Visão na Penumbra"], "custom": "" },
+      "conjuracao": "",
+      "nivel": { "value": 1, "xp": { "value": 0, "min": 0, "proximo": 1000, "pct": 0 } },
+      "carga": { "value": 14, "max": 28, "atributo": "for", "base": 14, "bonus": [], "pct": 0, "encumbered": false },
+      "treino": 0
+    },
+    "detalhes": {
+      "biography": { "value": "", "public": "" },
+      "raca": "Sílfide",
+      "divindade": "Marah",
+      "origem": "Minerador",
+      "info": "Ficha criada no Fichas de Nimb"
+    },
+    "tracos": {
+      "tamanho": "min",
+      "profArmas": { "value": [] },
+      "profArmaduras": { "value": [] }
+    },
+    "pericias": {
+      "acro": { "atributo": "des", "treinado": false },
+      "atle": { "atributo": "for", "treinado": true },
+      "cura": { "atributo": "sab", "treinado": true },
+      "dipl": { "atributo": "car", "treinado": true },
+      "fort": { "atributo": "con", "treinado": false },
+      "inic": { "atributo": "des", "treinado": false },
+      "intu": { "atributo": "sab", "treinado": true },
+      "luta": { "atributo": "for", "treinado": true },
+      "mist": { "atributo": "int", "treinado": false },
+      "perc": { "atributo": "sab", "treinado": false },
+      "pont": { "atributo": "des", "treinado": false },
+      "refl": { "atributo": "des", "treinado": false },
+      "vont": { "atributo": "sab", "treinado": true }
+    }
+  },
+  "items": [
+    {
+      "name": "Paladino",
+      "type": "classe",
+      "system": { "inicial": true, "niveis": 1, "pvPorNivel": 5, "pmPorNivel": 3 }
+    },
+    {
+      "name": "Montante do Justiceiro",
+      "type": "arma",
+      "system": { "atributo": "for", "damage": "4d6+12", "bonus": 2, "tipo": "Melee" }
+    }
+  ]
+}

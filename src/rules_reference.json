@@ -1,0 +1,70 @@
+{
+  "classes": {
+    "Paladino": {
+      "pv_inicial": 20,
+      "pv_por_nivel": 5,
+      "pm_inicial": 3,
+      "pm_por_nivel": 3,
+      "pericias_treinadas": ["Luta", "Vontade"],
+      "pericias_adicionais": 2
+    },
+    "Guerreiro": {
+      "pv_inicial": 20,
+      "pv_por_nivel": 5,
+      "pm_inicial": 3,
+      "pm_por_nivel": 3,
+      "pericias_treinadas": ["Luta", "Fortitude"],
+      "pericias_adicionais": 2
+    },
+    "Arcanista": {
+      "pv_inicial": 8,
+      "pv_por_nivel": 2,
+      "pm_inicial": 6,
+      "pm_por_nivel": 6,
+      "pericias_treinadas": ["Misticismo", "Vontade"],
+      "pericias_adicionais": 1
+    }
+  },
+  "racas": {
+    "Humano": {
+      "modificadores": "Escolha +2 em três atributos diferentes",
+      "habilidades": ["1 Perícia treinada extra", "1 Poder geral extra"]
+    },
+    "Silfide": {
+      "modificadores": {
+        "carisma": 4,
+        "destreza": 2,
+        "forca": -2
+      },
+      "tamanho": "Minúsculo"
+    },
+    "Lefou": {
+      "modificadores": "Escolha +2 em três atributos diferentes (exceto Carisma); -2 em Carisma",
+      "habilidades": ["Deformidade", "Visão no Escuro"]
+    },
+    "Qareen": {
+      "modificadores": {
+        "carisma": 4,
+        "inteligencia": 2
+      },
+      "habilidades": ["Desejos", "Resistência Elemental"]
+    }
+  },
+  "tabela_atributos": {
+    "formula": "(valor - 10) / 2, arredondado para baixo",
+    "exemplos": {
+      "8": -1,
+      "10": 0,
+      "12": 1,
+      "14": 2,
+      "16": 3,
+      "18": 4,
+      "20": 5
+    }
+  },
+  "escala_treino": [
+    { "niveis": "1-6", "bonus": 2 },
+    { "niveis": "7-14", "bonus": 4 },
+    { "niveis": "15-20", "bonus": 6 }
+  ]
+}
