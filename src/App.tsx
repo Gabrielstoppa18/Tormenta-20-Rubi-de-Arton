@@ -239,18 +239,7 @@ const VFXOverlay = ({ type, onComplete }: { type: VFXType; onComplete: () => voi
         </motion.div>
       </motion.div>
     ),
-    'skill': (
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
-      >
-        <div className="bg-gothic-gold/20 px-8 py-4 border border-gothic-gold/40 backdrop-blur-sm">
-          <h3 className="font-cinzel text-2xl text-gothic-gold tracking-widest">SUCESSO</h3>
-        </div>
-      </motion.div>
-    ),
+    'skill': null,
   };
 
   return variants[type];
@@ -1057,7 +1046,8 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 flex items-center justify-center z-[60] bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 flex items-center justify-center z-[60] bg-black/80 backdrop-blur-sm cursor-pointer"
+            onClick={() => setRollData(null)}
           >
             <motion.div
               initial={{ scale: 0.5, rotate: -10 }}
