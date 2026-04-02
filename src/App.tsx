@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Shield, 
   Sword, 
@@ -24,7 +24,10 @@ import {
   ChevronDown,
   Settings,
   PlusCircle,
-  Trash2
+  Trash2,
+  Sparkles,
+  Skull,
+  ZapOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
@@ -109,6 +112,144 @@ const SkillRow = ({ name, bonus, onClick }: { key?: React.Key; name: string; bon
   </div>
 );
 
+// --- VFX System ---
+
+type VFXType = 'level-up' | 'crit-hit' | 'crit-fail' | 'attack' | 'spell' | 'skill';
+
+const SOUNDS = {
+  'level-up': 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3',
+  'crit-hit': 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3',
+  'crit-fail': 'https://assets.mixkit.co/active_storage/sfx/2016/2016-preview.mp3',
+  'attack': 'https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3',
+  'spell': 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3',
+  'skill': 'https://assets.mixkit.co/active_storage/sfx/2015/2015-preview.mp3',
+};
+
+const playSound = (type: VFXType) => {
+  const audio = new Audio(SOUNDS[type]);
+  audio.volume = 0.4;
+  audio.play().catch(() => {}); // Ignore autoplay blocks
+};
+
+const VFXOverlay = ({ type, onComplete }: { type: VFXType; onComplete: () => void }) => {
+  useEffect(() => {
+    playSound(type);
+    const timer = setTimeout(onComplete, 2000);
+    return () => clearTimeout(timer);
+  }, [type, onComplete]);
+
+  const variants = {
+    'level-up': (
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.5 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 1.5 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+      >
+        <div className="absolute inset-0 bg-gothic-gold/10 backdrop-blur-[2px]" />
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+          className="absolute w-[600px] h-[600px] border border-gothic-gold/20 rounded-full"
+        />
+        <div className="relative flex flex-col items-center">
+          <motion.div
+            animate={{ y: [0, -20, 0], opacity: [0, 1, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+            className="text-gothic-gold mb-4"
+          >
+            <Sparkles size={80} />
+          </motion.div>
+          <h2 className="font-cinzel text-6xl font-bold text-gothic-gold drop-shadow-[0_0_20px_rgba(212,175,55,0.8)]">NÍVEL UP!</h2>
+        </div>
+      </motion.div>
+    ),
+    'crit-hit': (
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-gothic-red/20"
+      >
+        <motion.div
+          animate={{ scale: [1, 1.5, 1], rotate: [-5, 5, -5] }}
+          transition={{ duration: 0.2, repeat: 5 }}
+          className="flex flex-col items-center"
+        >
+          <Skull size={120} className="text-gothic-red drop-shadow-[0_0_30px_#8B0000]" />
+          <h2 className="font-medieval text-8xl text-gothic-red mt-4 drop-shadow-[0_0_20px_#000]">CRÍTICO!</h2>
+        </motion.div>
+      </motion.div>
+    ),
+    'crit-fail': (
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-black/60"
+      >
+        <motion.div
+          animate={{ y: [0, 20, 0], opacity: [1, 0.5, 1] }}
+          transition={{ duration: 0.5, repeat: 3 }}
+          className="flex flex-col items-center"
+        >
+          <ZapOff size={100} className="text-gray-600" />
+          <h2 className="font-cinzel text-5xl text-gray-400 mt-4 tracking-[0.5em]">FALHA CRÍTICA</h2>
+        </motion.div>
+      </motion.div>
+    ),
+    'attack': (
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+      >
+        <motion.div
+          initial={{ x: -200, opacity: 0, rotate: -45 }}
+          animate={{ x: 200, opacity: [0, 1, 0], rotate: 45 }}
+          transition={{ duration: 0.4 }}
+          className="w-1 h-[400px] bg-white shadow-[0_0_20px_#fff]"
+        />
+      </motion.div>
+    ),
+    'spell': (
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+      >
+        <motion.div
+          initial={{ scale: 0, rotate: 0 }}
+          animate={{ scale: [0, 1.2, 1], rotate: 180 }}
+          exit={{ scale: 2, opacity: 0 }}
+          className="w-64 h-64 border-4 border-double border-gothic-blue rounded-full flex items-center justify-center"
+        >
+          <div className="w-48 h-48 border border-gothic-blue/40 rounded-full animate-pulse" />
+          <div className="absolute text-gothic-blue">
+            <Zap size={60} />
+          </div>
+        </motion.div>
+      </motion.div>
+    ),
+    'skill': (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
+      >
+        <div className="bg-gothic-gold/20 px-8 py-4 border border-gothic-gold/40 backdrop-blur-sm">
+          <h3 className="font-cinzel text-2xl text-gothic-gold tracking-widest">SUCESSO</h3>
+        </div>
+      </motion.div>
+    ),
+  };
+
+  return variants[type];
+};
+
 export default function App() {
   const { 
     state, 
@@ -135,19 +276,39 @@ export default function App() {
   } = useCharacter();
 
   const [activeTab, setActiveTab] = useState<'geral' | 'combate' | 'pericias' | 'inventario' | 'grimorio'>('geral');
-  const [rollData, setRollData] = useState<{ result: number; bonus: number; isCritical: boolean } | null>(null);
+  const [rollData, setRollData] = useState<{ result: number; bonus: number; isCritical: boolean; isFail: boolean } | null>(null);
   const [showAddPower, setShowAddPower] = useState(false);
   const [showAddItem, setShowAddItem] = useState(false);
   const [showAddSpell, setShowAddSpell] = useState(false);
+  const [activeVFX, setActiveVFX] = useState<VFXType | null>(null);
 
-  const handleRoll = (bonus: number) => {
+  const triggerVFX = (type: VFXType) => {
+    setActiveVFX(null);
+    setTimeout(() => setActiveVFX(type), 10);
+  };
+
+  const handleRoll = (bonus: number, type: VFXType = 'skill') => {
     const natural = Math.floor(Math.random() * 20) + 1;
+    const isCritical = natural === 20;
+    const isFail = natural === 1;
+
     setRollData({
       result: natural + bonus,
       bonus: bonus,
-      isCritical: natural === 20
+      isCritical,
+      isFail
     });
+
+    if (isCritical) triggerVFX('crit-hit');
+    else if (isFail) triggerVFX('crit-fail');
+    else triggerVFX(type);
+
     setTimeout(() => setRollData(null), 4000);
+  };
+
+  const handleLevelUp = () => {
+    levelUp();
+    triggerVFX('level-up');
   };
 
   const tabs = [
@@ -227,7 +388,7 @@ export default function App() {
                 NÍVEL {state.level}
               </div>
               <button 
-                onClick={levelUp}
+                onClick={handleLevelUp}
                 className="p-1.5 text-gothic-gold hover:bg-gothic-gold hover:text-gothic-bg transition-all"
                 title="Level Up"
               >
@@ -240,6 +401,10 @@ export default function App() {
             />
           </div>
         </header>
+
+        <AnimatePresence>
+          {activeVFX && <VFXOverlay type={activeVFX} onComplete={() => setActiveVFX(null)} />}
+        </AnimatePresence>
 
         <div className="p-8 max-w-6xl mx-auto space-y-8">
           {activeTab === 'geral' && (
@@ -428,7 +593,7 @@ export default function App() {
                               </div>
                             </div>
                             <button 
-                              onClick={() => handleRoll(bonus)}
+                              onClick={() => handleRoll(bonus, 'attack')}
                               className="px-6 py-2 bg-gothic-gold/10 border border-gothic-gold/30 text-gothic-gold font-cinzel text-xs font-bold hover:bg-gothic-gold hover:text-gothic-bg transition-all"
                             >
                               ATACAR (+{bonus})
@@ -443,19 +608,23 @@ export default function App() {
                 {/* Defense & Stats */}
                 <div className="bg-gothic-card p-8 border border-gothic-gold/10 flex flex-col items-center justify-center text-center space-y-6">
                   <div className="relative">
-                    <Shield size={80} className="text-gothic-gold/20" />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[10px] font-bold text-gothic-text/40 uppercase tracking-widest">Defesa</span>
-                      <p className="font-cinzel text-5xl font-bold text-gothic-gold leading-none">{defesa}</p>
+                    <Shield size={100} className="text-gothic-gold/10 fill-gothic-gold/5" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
+                      <span className="text-[9px] font-bold text-gothic-gold/60 uppercase tracking-[0.2em] mb-1">Defesa</span>
+                      <p className="font-cinzel text-4xl font-bold text-gothic-gold leading-none">{defesa}</p>
                     </div>
                   </div>
                   <div className="w-full pt-6 border-t border-gothic-gold/5 space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gothic-text/40 uppercase">Bônus Manual</span>
+                      <span className="text-[10px] font-bold text-gothic-text/40 uppercase tracking-widest">Bônus Manual</span>
                       <div className="flex items-center gap-3">
-                        <button onClick={() => setDefenseBonus(state.defenseBonus - 1)} className="text-gothic-gold/60 hover:text-gothic-gold"><Minus size={12}/></button>
-                        <span className="font-cinzel text-sm text-gothic-text">{state.defenseBonus}</span>
-                        <button onClick={() => setDefenseBonus(state.defenseBonus + 1)} className="text-gothic-gold/60 hover:text-gothic-gold"><Plus size={12}/></button>
+                        <button onClick={() => setDefenseBonus(state.defenseBonus - 1)} className="text-gothic-gold/60 hover:text-gothic-gold transition-colors">
+                          <Minus size={14}/>
+                        </button>
+                        <span className="font-cinzel text-sm font-bold text-gothic-gold">{state.defenseBonus}</span>
+                        <button onClick={() => setDefenseBonus(state.defenseBonus + 1)} className="text-gothic-gold/60 hover:text-gothic-gold transition-colors">
+                          <Plus size={14}/>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -479,7 +648,7 @@ export default function App() {
                     <div key={skillName} className={cn(
                       "flex items-center justify-between p-2 border-b border-gothic-gold/5 transition-colors group cursor-pointer",
                       isTrained ? "bg-gothic-gold/5" : "hover:bg-gothic-card/40"
-                    )} onClick={() => handleRoll(bonus)}>
+                    )} onClick={() => handleRoll(bonus, 'skill')}>
                       <div className="flex items-center gap-2">
                         {isTrained && <Trophy size={10} className="text-gothic-gold" />}
                         <span className={cn(
@@ -571,7 +740,10 @@ export default function App() {
                           <h5 className="font-cinzel text-xs font-bold text-gothic-text">{spell.name}</h5>
                           <p className="text-[8px] text-gothic-text/40 uppercase">{spell.type} • {spell.circle}º Círculo</p>
                         </div>
-                        <button onClick={() => addSpell(spell)} className="text-gothic-gold hover:text-white"><Plus size={14}/></button>
+                        <button onClick={() => {
+                          addSpell(spell);
+                          triggerVFX('spell');
+                        }} className="text-gothic-gold hover:text-white"><Plus size={14}/></button>
                       </div>
                     </div>
                   ))}
@@ -630,13 +802,22 @@ export default function App() {
                   CRÍTICO!
                 </motion.div>
               )}
+              {rollData.isFail && (
+                <motion.div 
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1.2 }}
+                  className="absolute -top-10 left-1/2 -translate-x-1/2 bg-gray-600 text-white font-medieval px-6 py-2 border-2 border-gray-400 shadow-[0_0_20px_#333]"
+                >
+                  FALHA!
+                </motion.div>
+              )}
               <div className="absolute -top-4 -left-4 w-8 h-8 border-t-2 border-l-2 border-gothic-gold" />
               <div className="absolute -bottom-4 -right-4 w-8 h-8 border-b-2 border-r-2 border-gothic-gold" />
               
               <p className="font-cinzel text-sm text-gothic-gold tracking-widest uppercase mb-2 text-gothic-gold">Resultado Total</p>
               <h2 className={cn(
                 "font-cinzel text-8xl font-bold drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]",
-                rollData.isCritical ? "text-gothic-red" : "text-white"
+                rollData.isCritical ? "text-gothic-red" : rollData.isFail ? "text-gray-500" : "text-white"
               )}>
                 {rollData.result}
               </h2>
