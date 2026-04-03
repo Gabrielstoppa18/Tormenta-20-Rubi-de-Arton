@@ -87,3 +87,49 @@ export type CharacterPower = {
   created_at: string;
   power?: Power; // Joined data
 };
+
+export interface Database {
+  public: {
+    Tables: {
+      characters: {
+        Row: Character;
+        Insert: Partial<Character>;
+        Update: Partial<Character>;
+      };
+      classes: {
+        Row: Class;
+        Insert: Partial<Class>;
+        Update: Partial<Class>;
+      };
+      races: {
+        Row: Race;
+        Insert: Partial<Race>;
+        Update: Partial<Race>;
+      };
+      origins: {
+        Row: Origin;
+        Insert: Partial<Origin>;
+        Update: Partial<Origin>;
+      };
+      powers: {
+        Row: Power;
+        Insert: Partial<Power>;
+        Update: Partial<Power>;
+      };
+      character_powers: {
+        Row: CharacterPower;
+        Insert: Partial<CharacterPower>;
+        Update: Partial<CharacterPower>;
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+  };
+}

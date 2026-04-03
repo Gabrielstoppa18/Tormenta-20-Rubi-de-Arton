@@ -3,6 +3,7 @@ import { compendiumService } from '../lib/compendium';
 import type { Race, Class, Origin, ClassPower } from '../types/database';
 import { Shield, Sword, User, Book, Plus, ChevronRight, ChevronLeft, Sparkles, Trophy, Heart, Zap } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { CLASSES, RACES } from '../data/t20-data';
 
 interface ClassDetailsProps {
   classId: string;
@@ -20,7 +21,23 @@ export function ClassDetails({ classId }: ClassDetailsProps) {
           compendiumService.getClassById(classId),
           compendiumService.getClassPowers(classId)
         ]);
-        setCls(c);
+        
+        if (c) {
+          setCls(c);
+        } else if (CLASSES[classId]) {
+          const local = CLASSES[classId];
+          setCls({
+            id: classId,
+            name: local.name,
+            description: "Dados locais (Classe não encontrada no banco de dados)",
+            hp_initial: local.initialPV,
+            hp_per_level: local.pvPerLevel,
+            mana_per_level: local.pmPerLevel,
+            raw_data: local,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
         setPowers(p);
       } catch (error) {
         console.error('Error loading class details:', error);
@@ -91,7 +108,19 @@ export function RaceDetails({ raceId }: RaceDetailsProps) {
     const loadRace = async () => {
       try {
         const data = await compendiumService.getRaceById(raceId);
-        setRace(data);
+        if (data) {
+          setRace(data);
+        } else if (RACES[raceId]) {
+          const local = RACES[raceId];
+          setRace({
+            id: raceId,
+            name: local.name,
+            description: "Dados locais (Raça não encontrada no banco de dados)",
+            raw_data: local,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
       } catch (error) {
         console.error('Error loading race details:', error);
       } finally {

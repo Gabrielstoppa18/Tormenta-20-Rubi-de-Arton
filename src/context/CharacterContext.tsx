@@ -112,8 +112,19 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
       const newLevel = s.level + 1;
       const t20Class = CLASSES[s.class];
       if (!t20Class) return s;
-      const pvGain = t20Class.pvPerLevel + calculateModifier(s.attributes.con);
-      const pmGain = t20Class.pmPerLevel;
+      
+      // Base gains
+      let pvGain = t20Class.pvPerLevel + calculateModifier(s.attributes.con);
+      let pmGain = t20Class.pmPerLevel;
+      
+      // Power bonuses
+      if (s.powers.some(p => p.name === 'Vitalidade')) {
+        pvGain += 2;
+      }
+      if (s.powers.some(p => p.name === 'Vontade de Ferro')) {
+        pmGain += 1;
+      }
+      
       return {
         ...s,
         level: newLevel,

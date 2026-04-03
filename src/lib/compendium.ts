@@ -57,8 +57,8 @@ export const compendiumService = {
     const { data, error } = await supabase
       .from('races')
       .select('*')
-      .eq('id', id)
-      .single();
+      .or(`id.eq."${id}",name.ilike."${id}"`)
+      .maybeSingle();
     if (error) throw error;
     return data;
   },
@@ -67,8 +67,8 @@ export const compendiumService = {
     const { data, error } = await supabase
       .from('classes')
       .select('*')
-      .eq('id', id)
-      .single();
+      .or(`id.eq."${id}",name.ilike."${id}"`)
+      .maybeSingle();
     if (error) throw error;
     return data;
   },
@@ -77,8 +77,8 @@ export const compendiumService = {
     const { data, error } = await supabase
       .from('origins')
       .select('*')
-      .eq('id', id)
-      .single();
+      .or(`id.eq."${id}",name.ilike."${id}"`)
+      .maybeSingle();
     if (error) throw error;
     return data;
   }

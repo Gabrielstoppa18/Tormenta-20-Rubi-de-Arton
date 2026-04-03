@@ -38,8 +38,11 @@ import { calculateSkill } from './lib/t20-logic';
 import { CharacterCreation } from './components/CharacterCreation';
 import { PowersList } from './components/PowersList';
 import { ClassDetails, RaceDetails, OriginDetails } from './components/CompendiumDetails';
+import { LevelUpChoice } from './components/LevelUpChoice';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { characterService } from './lib/character';
+import { compendiumService } from './lib/compendium';
+import type { Race, Class, Origin } from './types/database';
 
 // --- Components ---
 
@@ -281,12 +284,19 @@ export default function App() {
   const [showAddItem, setShowAddItem] = useState(false);
   const [showAddSpell, setShowAddSpell] = useState(false);
   const [activeVFX, setActiveVFX] = useState<VFXType | null>(null);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   
   const [user, setUser] = useState<any>(null);
   const [characters, setCharacters] = useState<any[]>([]);
   const [currentCharacterId, setCurrentCharacterId] = useState<string | null>(null);
   const [showCreation, setShowCreation] = useState(false);
   const [loadingCharacters, setLoadingCharacters] = useState(false);
+
+  // Compendium lists from DB
+  const [dbClasses, setDbClasses] = useState<Class[]>([]);
+  const [dbRaces, setDbRaces] = useState<Race[]>([]);
+  const [dbOrigins, setDbOrigins] = useState<Origin[]>([]);
+  const [loadingCompendium, setLoadingCompendium] = useState(false);
 
   useEffect(() => {
     // Check for active session
@@ -309,6 +319,30 @@ export default function App() {
       setCurrentCharacterId(null);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (activeTab === 'compendio') {
+      loadCompendiumLists();
+    }
+  }, [activeTab]);
+
+  const loadCompendiumLists = async () => {
+    setLoadingCompendium(true);
+    try {
+      const [c, r, o] = await Promise.all([
+        compendiumService.getClasses(),
+        compendiumService.getRaces(),
+        compendiumService.getOrigins()
+      ]);
+      setDbClasses(c);
+      setDbRaces(r);
+      setDbOrigins(o);
+    } catch (error) {
+      console.error('Error loading compendium lists:', error);
+    } finally {
+      setLoadingCompendium(false);
+    }
+  };
 
   const loadUserCharacters = async () => {
     if (!user) return;
@@ -394,6 +428,7 @@ export default function App() {
   const handleLevelUp = () => {
     levelUp();
     triggerVFX('level-up');
+    setShowLevelUpModal(true);
   };
 
   const tabs = [
@@ -421,14 +456,12 @@ export default function App() {
           >
             ENTRAR COM GOOGLE
           </button>
-          {!isSupabaseConfigured && (
-            <button 
-              onClick={() => setUser({ id: 'guest', email: 'guest@arthon.com' })}
-              className="w-full py-2 border border-gothic-gold/20 text-gothic-gold/40 font-cinzel text-[10px] hover:text-gothic-gold transition-all tracking-[0.3em] uppercase"
-            >
-              Entrar como Convidado (Modo Offline)
-            </button>
-          )}
+          <button 
+            onClick={() => setUser({ id: 'guest-user-id', email: 'convidado@arthon.com' })}
+            className="w-full py-2 border border-gothic-gold/20 text-gothic-gold/40 font-cinzel text-[10px] hover:text-gothic-gold transition-all tracking-[0.3em] uppercase"
+          >
+            Entrar como Convidado (Bypass Teste)
+          </button>
           <p className="text-[10px] text-gothic-text/30 uppercase tracking-widest">
             Desenvolvido para aventureiros de elite
           </p>
@@ -438,10 +471,14 @@ export default function App() {
   }
 
   if (showCreation) {
-    return <CharacterCreation userId={user.id} onComplete={(id) => {
-      setCurrentCharacterId(id);
-      setShowCreation(false);
-    }} />;
+    return <CharacterCreation 
+      userId={user.id} 
+      onComplete={(id) => {
+        setCurrentCharacterId(id);
+        setShowCreation(false);
+      }} 
+      onCancel={() => setShowCreation(false)}
+    />;
   }
 
   return (
@@ -967,16 +1004,31 @@ export default function App() {
               
               {compendioTab === 'classes' && !selectedEntityId && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Object.keys(CLASSES).map(c => (
-                    <button 
-                      key={c} 
-                      onClick={() => setSelectedEntityId(c)}
-                      className="p-6 bg-gothic-card border border-gothic-gold/10 hover:border-gothic-gold/40 transition-all text-left group"
-                    >
-                      <h4 className="font-cinzel text-xl font-bold text-gothic-gold group-hover:tracking-widest transition-all">{c}</h4>
-                      <p className="text-[10px] text-gothic-text/40 mt-2 uppercase tracking-widest">Ver Detalhes</p>
-                    </button>
-                  ))}
+                  {loadingCompendium ? (
+                    <div className="col-span-full text-center py-12 font-cinzel text-gothic-gold animate-pulse">Consultando Arquivos...</div>
+                  ) : dbClasses.length > 0 ? (
+                    dbClasses.map(c => (
+                      <button 
+                        key={c.id} 
+                        onClick={() => setSelectedEntityId(c.id)}
+                        className="p-6 bg-gothic-card border border-gothic-gold/10 hover:border-gothic-gold/40 transition-all text-left group"
+                      >
+                        <h4 className="font-cinzel text-xl font-bold text-gothic-gold group-hover:tracking-widest transition-all">{c.name}</h4>
+                        <p className="text-[10px] text-gothic-text/40 mt-2 uppercase tracking-widest">Ver Detalhes</p>
+                      </button>
+                    ))
+                  ) : (
+                    Object.keys(CLASSES).map(c => (
+                      <button 
+                        key={c} 
+                        onClick={() => setSelectedEntityId(c)}
+                        className="p-6 bg-gothic-card border border-gothic-gold/10 hover:border-gothic-gold/40 transition-all text-left group"
+                      >
+                        <h4 className="font-cinzel text-xl font-bold text-gothic-gold group-hover:tracking-widest transition-all">{c}</h4>
+                        <p className="text-[10px] text-gothic-text/40 mt-2 uppercase tracking-widest">Ver Detalhes (Local)</p>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
               {compendioTab === 'classes' && selectedEntityId && (
@@ -990,16 +1042,31 @@ export default function App() {
 
               {compendioTab === 'races' && !selectedEntityId && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Object.keys(RACES).map(r => (
-                    <button 
-                      key={r} 
-                      onClick={() => setSelectedEntityId(r)}
-                      className="p-6 bg-gothic-card border border-gothic-gold/10 hover:border-gothic-gold/40 transition-all text-left group"
-                    >
-                      <h4 className="font-cinzel text-xl font-bold text-gothic-gold group-hover:tracking-widest transition-all">{r}</h4>
-                      <p className="text-[10px] text-gothic-text/40 mt-2 uppercase tracking-widest">Ver Detalhes</p>
-                    </button>
-                  ))}
+                  {loadingCompendium ? (
+                    <div className="col-span-full text-center py-12 font-cinzel text-gothic-gold animate-pulse">Consultando Arquivos...</div>
+                  ) : dbRaces.length > 0 ? (
+                    dbRaces.map(r => (
+                      <button 
+                        key={r.id} 
+                        onClick={() => setSelectedEntityId(r.id)}
+                        className="p-6 bg-gothic-card border border-gothic-gold/10 hover:border-gothic-gold/40 transition-all text-left group"
+                      >
+                        <h4 className="font-cinzel text-xl font-bold text-gothic-gold group-hover:tracking-widest transition-all">{r.name}</h4>
+                        <p className="text-[10px] text-gothic-text/40 mt-2 uppercase tracking-widest">Ver Detalhes</p>
+                      </button>
+                    ))
+                  ) : (
+                    Object.keys(RACES).map(r => (
+                      <button 
+                        key={r} 
+                        onClick={() => setSelectedEntityId(r)}
+                        className="p-6 bg-gothic-card border border-gothic-gold/10 hover:border-gothic-gold/40 transition-all text-left group"
+                      >
+                        <h4 className="font-cinzel text-xl font-bold text-gothic-gold group-hover:tracking-widest transition-all">{r}</h4>
+                        <p className="text-[10px] text-gothic-text/40 mt-2 uppercase tracking-widest">Ver Detalhes (Local)</p>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
               {compendioTab === 'races' && selectedEntityId && (
@@ -1013,19 +1080,27 @@ export default function App() {
 
               {compendioTab === 'origins' && !selectedEntityId && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Mocking origins list for now as it's not in t20-data.ts but in DB */}
-                  <div className="col-span-full p-8 text-center border border-dashed border-gothic-gold/20">
-                    <p className="font-cinzel text-gothic-text/40">Selecione uma origem para ver detalhes do banco de dados.</p>
-                    <div className="mt-4 flex flex-wrap justify-center gap-2">
-                      {['acólito', 'artesão', 'charlatão', 'criminoso'].map(o => (
-                        <button key={o} onClick={() => setSelectedEntityId(o)} className="px-4 py-2 bg-gothic-card border border-gothic-gold/10 text-gothic-gold text-xs font-cinzel hover:border-gothic-gold transition-all">
-                          {o.toUpperCase()}
-                        </button>
-                      ))}
+                  {loadingCompendium ? (
+                    <div className="col-span-full text-center py-12 font-cinzel text-gothic-gold animate-pulse">Consultando Arquivos...</div>
+                  ) : dbOrigins.length > 0 ? (
+                    dbOrigins.map(o => (
+                      <button 
+                        key={o.id} 
+                        onClick={() => setSelectedEntityId(o.id)}
+                        className="p-6 bg-gothic-card border border-gothic-gold/10 hover:border-gothic-gold/40 transition-all text-left group"
+                      >
+                        <h4 className="font-cinzel text-xl font-bold text-gothic-gold group-hover:tracking-widest transition-all">{o.name}</h4>
+                        <p className="text-[10px] text-gothic-text/40 mt-2 uppercase tracking-widest">Ver Detalhes</p>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="col-span-full p-8 text-center border border-dashed border-gothic-gold/20">
+                      <p className="font-cinzel text-gothic-text/40">Nenhuma origem encontrada no banco de dados.</p>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
+
               {compendioTab === 'origins' && selectedEntityId && (
                 <div>
                   <button onClick={() => setSelectedEntityId(null)} className="mb-4 text-gothic-gold font-cinzel text-xs flex items-center gap-2">
@@ -1041,6 +1116,12 @@ export default function App() {
 
       {/* --- Roll Result Modal --- */}
       <AnimatePresence>
+        {showLevelUpModal && (
+          <LevelUpChoice 
+            onComplete={() => setShowLevelUpModal(false)}
+            onCancel={() => setShowLevelUpModal(false)}
+          />
+        )}
         {rollData && (
           <motion.div
             initial={{ opacity: 0 }}

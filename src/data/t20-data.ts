@@ -177,6 +177,26 @@ export const POWERS: T20Power[] = [
     description: "Você recebe uma ação de movimento extra na primeira rodada.",
     requirements: ["DES 13"],
   },
+  {
+    name: "Vitalidade",
+    description: "Você recebe +2 PV por nível.",
+    requirements: ["CON 13"],
+  },
+  {
+    name: "Vontade de Ferro",
+    description: "Você recebe +1 PM por nível.",
+    requirements: ["SAB 13"],
+  },
+  {
+    name: "Esquiva",
+    description: "Você recebe +2 em Defesa e Reflexos.",
+    requirements: ["DES 13"],
+  },
+  {
+    name: "Foco em Arma",
+    description: "Você recebe +2 em testes de ataque com uma arma escolhida.",
+    requirements: ["Luta ou Pontaria treinada"],
+  },
 ];
 
 export interface T20Spell {
