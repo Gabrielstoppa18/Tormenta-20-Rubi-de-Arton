@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { calculateModifier, calculatePV, calculatePM, calculateDefesa } from '../lib/t20-logic';
-import { CLASSES, RACES, T20Power, T20Spell } from '../data/t20-data';
+import { CLASSES, RACES, ITEMS, T20Power, T20Spell } from '../data/t20-data';
 import { characterService } from '../lib/character';
 import { compendiumService } from '../lib/compendium';
 import type { Character } from '../types/database';
@@ -14,6 +14,16 @@ interface Attributes {
   car: number;
 }
 
+export interface T20InventoryItem {
+  id: string;
+  name: string;
+  type: string;
+  weight: number;
+  cost: string;
+  quantity: number;
+  description?: string;
+}
+
 interface CharacterState {
   name: string;
   race: string;
@@ -25,7 +35,7 @@ interface CharacterState {
   currentPM: number;
   powers: T20Power[];
   spells: T20Spell[];
-  inventory: string[];
+  inventory: T20InventoryItem[];
   defenseBonus: number;
 }
 
@@ -49,7 +59,8 @@ interface CharacterContextType {
   addSpell: (spell: T20Spell) => void;
   removeSpell: (spellName: string) => void;
   addItem: (itemName: string) => void;
-  removeItem: (itemName: string) => void;
+  updateItem: (id: string, updates: Partial<T20InventoryItem>) => void;
+  removeItem: (id: string) => void;
   levelUp: () => void;
   levelDown: () => void;
   loadCharacter: (id: string) => Promise<void>;
@@ -70,7 +81,10 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
     currentPM: 3,
     powers: [],
     spells: [],
-    inventory: ["Espada Longa", "Armadura de Couro"],
+    inventory: [
+      { id: '1', name: "Espada Longa", type: "Arma Marcial", weight: 1.5, cost: "15 T$", quantity: 1 },
+      { id: '2', name: "Armadura de Couro", type: "Armadura Leve", weight: 7, cost: "10 T$", quantity: 1 }
+    ],
     defenseBonus: 0,
   });
 
@@ -104,8 +118,31 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
   const addSpell = (spell: T20Spell) => setState(s => ({ ...s, spells: [...s.spells, spell] }));
   const removeSpell = (spellName: string) => setState(s => ({ ...s, spells: s.spells.filter(sp => sp.name !== spellName) }));
   
-  const addItem = (itemName: string) => setState(s => ({ ...s, inventory: [...s.inventory, itemName] }));
-  const removeItem = (itemName: string) => setState(s => ({ ...s, inventory: s.inventory.filter(i => i !== itemName) }));
+  const addItem = (itemName: string) => {
+    const baseItem = ITEMS[itemName];
+    if (!baseItem) return;
+    
+    const newItem: T20InventoryItem = {
+      id: crypto.randomUUID(),
+      name: baseItem.name,
+      type: baseItem.type,
+      weight: baseItem.weight,
+      cost: baseItem.cost,
+      quantity: 1,
+      description: ''
+    };
+    
+    setState(s => ({ ...s, inventory: [...s.inventory, newItem] }));
+  };
+
+  const updateItem = (id: string, updates: Partial<T20InventoryItem>) => {
+    setState(s => ({
+      ...s,
+      inventory: s.inventory.map(item => item.id === id ? { ...item, ...updates } : item)
+    }));
+  };
+
+  const removeItem = (id: string) => setState(s => ({ ...s, inventory: s.inventory.filter(i => i.id !== id) }));
 
   const levelUp = () => {
     setState(s => {
@@ -163,9 +200,16 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
       // Fetch associated data (powers, etc.)
       const dbPowers = await characterService.getCharacterPowers(id);
       
+      let inventory: T20InventoryItem[] = [];
+      try {
+        if (char.notes && char.notes.startsWith('INVENTORY_JSON:')) {
+          inventory = JSON.parse(char.notes.replace('INVENTORY_JSON:', ''));
+        }
+      } catch (e) {
+        console.error('Error parsing inventory from notes:', e);
+      }
+
       // Map DB character to context state
-      // Note: We're mapping DB IDs back to display names for now to keep existing UI working
-      // In a real app, we'd use IDs everywhere
       setState({
         name: char.name,
         race: char.race_id || 'Humano',
@@ -188,7 +232,10 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
           requirements: dp.power?.requirement_text ? [dp.power.requirement_text] : []
         })),
         spells: [], // TODO: Fetch spells
-        inventory: [], // TODO: Fetch items
+        inventory: inventory.length > 0 ? inventory : [
+          { id: '1', name: "Espada Longa", type: "Arma Marcial", weight: 1.5, cost: "15 T$", quantity: 1 },
+          { id: '2', name: "Armadura de Couro", type: "Armadura Leve", weight: 7, cost: "10 T$", quantity: 1 }
+        ],
         defenseBonus: 0,
       });
     } catch (error) {
@@ -199,6 +246,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
   const saveCharacter = async () => {
     if (!currentCharacterId) return;
     try {
+      const inventoryJson = `INVENTORY_JSON:${JSON.stringify(state.inventory)}`;
       await characterService.updateCharacter(currentCharacterId, {
         name: state.name,
         race_id: state.race,
@@ -207,6 +255,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
         attributes_base: state.attributes,
         current_hp: state.currentPV,
         current_mp: state.currentPM,
+        notes: inventoryJson,
       });
       console.log('Character saved successfully');
     } catch (error) {
@@ -235,6 +284,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
       addSpell,
       removeSpell,
       addItem,
+      updateItem,
       removeItem,
       levelUp,
       levelDown,

@@ -5,7 +5,8 @@ import { compendiumService } from '../lib/compendium';
 import { characterService } from '../lib/character';
 import type { Race, Class, Origin, Power } from '../types/database';
 import { cn } from '../lib/utils';
-import { CLASSES, RACES } from '../data/t20-data';
+import SheetBuilder, { RaceFactory, RoleFactory, OriginFactory, Translator, ArcanistFactory, RoleName } from 't20-sheet-builder';
+import { Roles } from '../lib/compendium';
 
 interface CharacterCreationProps {
   onComplete: (characterId: string) => void;
@@ -39,39 +40,10 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
           compendiumService.getOrigins()
         ]);
         
-        // Fallback to local data if DB is empty
-        if (r.length === 0) {
-          setRaces(Object.values(RACES).map(race => ({
-            id: race.name,
-            name: race.name,
-            description: "Raça de Arthon (Local)",
-            raw_data: race,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })));
-        } else {
-          setRaces(r);
-        }
-
-        if (c.length === 0) {
-          setClasses(Object.values(CLASSES).map(cls => ({
-            id: cls.name,
-            name: cls.name,
-            description: "Classe de Arthon (Local)",
-            hp_initial: cls.initialPV,
-            hp_per_level: cls.pvPerLevel,
-            mana_per_level: cls.pmPerLevel,
-            raw_data: cls,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })));
-        } else {
-          setClasses(c);
-        }
-
+        setRaces(r);
+        setClasses(c);
         setOrigins(o);
         
-        // Fetch general powers for initial choices
         const p = await compendiumService.getPowers('Geral');
         setAvailablePowers(p);
       } catch (error) {
@@ -85,18 +57,107 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
 
   const handleCreate = async () => {
     try {
-      const selectedClass = classes.find(c => c.id === formData.class_id);
-      const conMod = formData.attributes_base.con;
+      // Use SheetBuilder to validate and calculate final stats
+      const builder = new SheetBuilder();
       
-      const initialPV = (selectedClass?.hp_initial || 0) + conMod;
-      const initialPM = (selectedClass?.mana_per_level || 0); // Level 1 PM is usually same as per level gain in T20? Actually it's class specific.
+      // 1. Set Attributes (Map from FOR/DES to strength/dexterity)
+      builder.setInitialAttributes({
+        strength: formData.attributes_base.for,
+        dexterity: formData.attributes_base.des,
+        constitution: formData.attributes_base.con,
+        intelligence: formData.attributes_base.int,
+        wisdom: formData.attributes_base.sab,
+        charisma: formData.attributes_base.car
+      });
+      
+      // 2. Choose Race
+      if (formData.race_id) {
+        let race;
+        if (formData.race_id === 'human') {
+          race = (RaceFactory as any).makeHuman({
+            name: 'human' as any,
+            selectedAttributes: ['strength', 'dexterity'], // Default choices
+            versatileChoices: [{ type: 'skill', name: 'athletics' }] // Default choice
+          } as any);
+        } else if (formData.race_id === 'qareen') {
+          race = (RaceFactory as any).makeQareen({
+            name: 'qareen' as any,
+            qareenType: 'light',
+            mysticTattooSpell: 'arcaneArmor'
+          } as any);
+        } else if (formData.race_id === 'lefeu') {
+          race = (RaceFactory as any).makeLefeu({
+            name: 'lefeu' as any,
+            selectedAttributes: ['strength', 'dexterity', 'constitution'],
+            deformityChoices: [{ name: 'claws' }],
+            previousRace: 'human'
+          } as any);
+        } else {
+          race = RaceFactory.makeFromSerialized({ name: formData.race_id as any } as any);
+        }
+        builder.chooseRace(race);
+      }
+      
+      // 3. Choose Role (Class)
+      if (formData.class_id) {
+        let role;
+        if (formData.class_id === RoleName.arcanist) {
+          role = ArcanistFactory.makeFromSerialized({ 
+            name: RoleName.arcanist, 
+            selectedSkillsByGroup: [],
+            path: { name: 'wizard', spells: ['arcaneArmor'] },
+            initialSpells: ['arcaneArmor', 'magicMissile', 'shield']
+          } as any);
+        } else if (formData.class_id === RoleName.warrior) {
+          role = RoleFactory.makeFromSerialized({ 
+            name: RoleName.warrior, 
+            selectedSkillsByGroup: [],
+          } as any);
+        } else {
+          // For other classes, instantiate directly using Roles map from compendium
+          const RoleClass = (Roles as any).get(formData.class_id);
+          if (RoleClass) {
+            role = new RoleClass([]);
+          }
+        }
+        
+        if (role) {
+          builder.chooseRole(role);
+        }
+      }
+      
+      // 4. Choose Origin
+      if (formData.origin_id) {
+        const origin = OriginFactory.makeFromSerialized({ 
+          name: formData.origin_id as any, 
+          chosenBenefits: [],
+          chosenAnimal: 'dog' // For AnimalsFriend
+        } as any);
+        builder.chooseOrigin(origin);
+      }
+
+      const sheet = builder.build();
+      const attributes = sheet.getSheetAttributes().getValues();
+      const maxHP = sheet.getMaxLifePoints();
+      const maxMP = sheet.getMaxManaPoints();
       
       const character = await characterService.createCharacter({
-        ...formData,
+        name: formData.name,
         user_id: userId,
+        race_id: formData.race_id,
+        class_id: formData.class_id,
+        origin_id: formData.origin_id,
         level: 1,
-        current_hp: initialPV,
-        current_mp: initialPM
+        attributes_base: {
+          for: attributes.strength,
+          des: attributes.dexterity,
+          con: attributes.constitution,
+          int: attributes.intelligence,
+          sab: attributes.wisdom,
+          car: attributes.charisma
+        },
+        current_hp: maxHP,
+        current_mp: maxMP
       });
 
       // Add initial powers
@@ -109,7 +170,7 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
       onComplete(character.id);
     } catch (error) {
       console.error('Error creating character:', error);
-      alert('Erro ao criar personagem. Verifique se você está logado.');
+      alert('Erro ao criar personagem. Verifique se a combinação de raça/classe é válida.');
     }
   };
 
@@ -123,6 +184,18 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
       </div>
     );
   }
+
+  const totalPoints = Object.values(formData.attributes_base).reduce((a, b) => (a as number) + (b as number), 0) as number;
+  const remainingPoints = 10 - totalPoints;
+
+  const attrMapping = {
+    for: 'strength',
+    des: 'dexterity',
+    con: 'constitution',
+    int: 'intelligence',
+    sab: 'wisdom',
+    car: 'charisma'
+  } as const;
 
   return (
     <div className="fixed inset-0 bg-gothic-bg z-50 overflow-y-auto gothic-scroll">
@@ -163,15 +236,15 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
                 <div className="flex justify-between items-center mb-6">
                   <label className="block font-cinzel text-sm text-gothic-gold uppercase tracking-widest">Distribua seus Atributos</label>
                   <div className="px-3 py-1 bg-gothic-gold/10 border border-gothic-gold/20">
-                    <span className="text-[10px] text-gothic-gold font-bold uppercase tracking-widest">Pontos: {
-                      10 - Object.values(formData.attributes_base).reduce((a, b) => a + b, 0)
-                    }</span>
+                    <span className="text-[10px] text-gothic-gold font-bold uppercase tracking-widest">Pontos: {remainingPoints}</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
-                  {(['for', 'des', 'con', 'int', 'sab', 'car'] as const).map(attr => (
+                  {(Object.keys(formData.attributes_base) as Array<keyof typeof formData.attributes_base>).map(attr => (
                     <div key={attr} className="flex flex-col items-center gap-2">
-                      <span className="text-[10px] font-bold text-gothic-gold uppercase tracking-widest">{attr}</span>
+                      <span className="text-[10px] font-bold text-gothic-gold uppercase tracking-widest">
+                        {Translator.getAttributeTranslation(attrMapping[attr]).substring(0, 3)}
+                      </span>
                       <div className="flex items-center gap-4">
                         <button 
                           onClick={() => setFormData(f => ({ ...f, attributes_base: { ...f.attributes_base, [attr]: f.attributes_base[attr] - 1 } }))}
@@ -181,8 +254,9 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
                         </button>
                         <span className="font-cinzel text-2xl font-bold text-gothic-text w-8 text-center">{formData.attributes_base[attr]}</span>
                         <button 
+                          disabled={remainingPoints <= 0}
                           onClick={() => setFormData(f => ({ ...f, attributes_base: { ...f.attributes_base, [attr]: f.attributes_base[attr] + 1 } }))}
-                          className="w-8 h-8 flex items-center justify-center border border-gothic-gold/20 hover:border-gothic-gold text-gothic-gold transition-colors"
+                          className="w-8 h-8 flex items-center justify-center border border-gothic-gold/20 hover:border-gothic-gold text-gothic-gold transition-colors disabled:opacity-20"
                         >
                           <Plus size={14} />
                         </button>
@@ -195,7 +269,7 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
 
               <div className="flex justify-end">
                 <button 
-                  disabled={!formData.name}
+                  disabled={!formData.name || remainingPoints !== 0}
                   onClick={() => setStep(2)}
                   className="flex items-center gap-2 px-8 py-3 bg-gothic-gold text-gothic-bg font-cinzel font-bold hover:bg-white transition-colors disabled:opacity-50"
                 >

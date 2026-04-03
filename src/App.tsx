@@ -32,13 +32,14 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from './lib/utils';
-import { useCharacter } from './context/CharacterContext';
+import { useCharacter, T20InventoryItem } from './context/CharacterContext';
 import { CLASSES, RACES, POWERS, SPELLS, DEITIES, ITEMS, SKILLS_ATTRIBUTES } from './data/t20-data';
 import { calculateSkill } from './lib/t20-logic';
 import { CharacterCreation } from './components/CharacterCreation';
 import { PowersList } from './components/PowersList';
 import { ClassDetails, RaceDetails, OriginDetails } from './components/CompendiumDetails';
 import { LevelUpChoice } from './components/LevelUpChoice';
+import { Auth } from './components/Auth';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { characterService } from './lib/character';
 import { compendiumService } from './lib/compendium';
@@ -85,28 +86,85 @@ const SpellItem = ({ name, desc, cost, icon }: { key?: React.Key; name: string; 
   </div>
 );
 
-const InventoryItem = ({ name, type, weight, cost, onRemove }: { key?: React.Key; name: string; type: string; weight: number; cost: string; onRemove: () => void }) => {
+const InventoryItem = ({ item, onUpdate, onRemove }: { item: T20InventoryItem; onUpdate: (updates: Partial<T20InventoryItem>) => void; onRemove: () => void; key?: React.Key }) => {
+  const [isEditing, setIsEditing] = useState(false);
+
   const getIcon = () => {
-    const lowerType = type.toLowerCase();
+    const lowerType = item.type.toLowerCase();
     if (lowerType.includes('arma')) return <Sword size={14} className="text-gothic-gold/60" />;
     if (lowerType.includes('armadura') || lowerType.includes('escudo')) return <Shield size={14} className="text-gothic-gold/60" />;
     return <Backpack size={14} className="text-gothic-gold/60" />;
   };
 
   return (
-    <div className="flex items-center justify-between p-3 bg-gothic-card/40 border border-gothic-gold/10 hover:border-gothic-gold/30 transition-colors">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-gothic-bg border border-gothic-gold/10">
-          {getIcon()}
+    <div className="flex flex-col p-4 bg-gothic-card/40 border border-gothic-gold/10 hover:border-gothic-gold/30 transition-colors group">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3 flex-1">
+          <div className="p-2 bg-gothic-bg border border-gothic-gold/10">
+            {getIcon()}
+          </div>
+          <div className="flex-1">
+            {isEditing ? (
+              <input 
+                value={item.name}
+                onChange={(e) => onUpdate({ name: e.target.value })}
+                className="w-full bg-black/40 border border-gothic-gold/20 p-1 font-cinzel text-xs text-gothic-text outline-none"
+                autoFocus
+              />
+            ) : (
+              <h5 className="font-cinzel text-xs font-bold text-gothic-text group-hover:text-gothic-gold transition-colors">{item.name}</h5>
+            )}
+            <p className="text-[9px] text-gothic-text/40 uppercase tracking-tighter">{item.type} • {item.weight}kg • {item.cost}</p>
+          </div>
         </div>
-        <div>
-          <h5 className="font-cinzel text-xs font-bold text-gothic-text">{name}</h5>
-          <p className="text-[9px] text-gothic-text/40 uppercase tracking-tighter">{type} • {weight}kg • {cost}</p>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setIsEditing(!isEditing)}
+            className="text-gothic-gold/40 hover:text-gothic-gold transition-colors"
+          >
+            <Settings size={12} />
+          </button>
+          <button onClick={onRemove} className="text-gothic-red/40 hover:text-gothic-red transition-colors">
+            <Trash2 size={12} />
+          </button>
         </div>
       </div>
-      <button onClick={onRemove} className="text-gothic-red/40 hover:text-gothic-red transition-colors">
-        <Minus size={14} />
-      </button>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[9px] font-bold text-gothic-gold/40 uppercase tracking-widest">Quantidade</span>
+          <div className="flex items-center bg-black/40 border border-gothic-gold/10 p-0.5">
+            <button 
+              onClick={() => onUpdate({ quantity: Math.max(0, item.quantity - 1) })}
+              className="p-1 text-gothic-gold/60 hover:text-gothic-gold"
+            >
+              <Minus size={10} />
+            </button>
+            <input 
+              type="number"
+              value={item.quantity}
+              onChange={(e) => onUpdate({ quantity: parseInt(e.target.value) || 0 })}
+              className="w-8 bg-transparent text-center text-xs font-bold font-cinzel text-gothic-text outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+            <button 
+              onClick={() => onUpdate({ quantity: item.quantity + 1 })}
+              className="p-1 text-gothic-gold/60 hover:text-gothic-gold"
+            >
+              <Plus size={10} />
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <span className="text-[9px] font-bold text-gothic-gold/40 uppercase tracking-widest">Descrição / Notas</span>
+          <textarea 
+            value={item.description || ''}
+            onChange={(e) => onUpdate({ description: e.target.value })}
+            placeholder="Adicione notas sobre o item..."
+            className="w-full bg-black/40 border border-gothic-gold/10 p-2 text-[10px] text-gothic-text/60 outline-none focus:border-gothic-gold/30 min-h-[40px] resize-none"
+          />
+        </div>
+      </div>
     </div>
   );
 };
@@ -268,6 +326,7 @@ export default function App() {
     addSpell,
     removeSpell,
     addItem,
+    updateItem,
     removeItem,
     levelUp,
     levelDown,
@@ -361,37 +420,6 @@ export default function App() {
     }
   };
 
-  const handleLogin = async () => {
-    if (!isSupabaseConfigured) {
-      alert('Configuração do Supabase não encontrada! Por favor, adicione VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no menu Settings (ícone de engrenagem).');
-      return;
-    }
-
-    // Detect if inside iframe
-    const isIframe = window.self !== window.top;
-    
-    if (isIframe) {
-      const wantsNewTab = window.confirm('O login via Google costuma ser bloqueado dentro de editores (iframes). Deseja abrir o app em uma nova aba para logar com segurança?');
-      if (wantsNewTab) {
-        window.open(window.location.href, '_blank');
-        return;
-      }
-    }
-
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
-        }
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      console.error('Erro no login:', error);
-      alert(`Erro ao entrar: ${error.message || 'Verifique as configurações de Redirect URI no painel do Supabase.'}`);
-    }
-  };
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
@@ -441,33 +469,7 @@ export default function App() {
   ] as const;
 
   if (!user) {
-    return (
-      <div className="h-screen bg-gothic-bg flex items-center justify-center p-8">
-        <div className="max-w-md w-full bg-gothic-card border border-gothic-gold/20 p-12 text-center space-y-8 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
-          <h1 className="font-cinzel text-4xl font-bold text-gothic-gold tracking-tighter">
-            TORMENTA <span className="text-gothic-red">20</span>
-          </h1>
-          <p className="text-gothic-text/60 font-cinzel text-sm leading-relaxed">
-            Bem-vindo ao Arthon Gothic Edition. Entre para forjar sua lenda nas terras de Arthon.
-          </p>
-          <button 
-            onClick={handleLogin}
-            className="w-full py-4 bg-gothic-gold text-gothic-bg font-cinzel font-bold tracking-widest hover:bg-white transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)]"
-          >
-            ENTRAR COM GOOGLE
-          </button>
-          <button 
-            onClick={() => setUser({ id: 'guest-user-id', email: 'convidado@arthon.com' })}
-            className="w-full py-2 border border-gothic-gold/20 text-gothic-gold/40 font-cinzel text-[10px] hover:text-gothic-gold transition-all tracking-[0.3em] uppercase"
-          >
-            Entrar como Convidado (Bypass Teste)
-          </button>
-          <p className="text-[10px] text-gothic-text/30 uppercase tracking-widest">
-            Desenvolvido para aventureiros de elite
-          </p>
-        </div>
-      </div>
-    );
+    return <Auth onSuccess={setUser} />;
   }
 
   if (showCreation) {
@@ -902,21 +904,15 @@ export default function App() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {state.inventory.map((itemName, idx) => {
-                  const item = ITEMS[itemName];
-                  if (!item) return null;
-                  return (
-                    <InventoryItem 
-                      key={`${itemName}-${idx}`}
-                      name={item.name}
-                      type={item.type}
-                      weight={item.weight}
-                      cost={item.cost}
-                      onRemove={() => removeItem(itemName)}
-                    />
-                  );
-                })}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {state.inventory.map((item) => (
+                  <InventoryItem 
+                    key={item.id}
+                    item={item}
+                    onUpdate={(updates) => updateItem(item.id, updates)}
+                    onRemove={() => removeItem(item.id)}
+                  />
+                ))}
               </div>
             </section>
           )}
