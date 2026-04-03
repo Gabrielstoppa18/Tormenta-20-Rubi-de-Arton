@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email"]
+    },
+    "Character": {
+      "title": "Character",
+      "description": "A Tormenta 20 character",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "name": { "type": "string" },
+        "race_id": { "type": "string" },
+        "class_id": { "type": "string" },
+        "origin_id": { "type": "string" },
+        "level": { "type": "integer" },
+        "attributes_base": { "type": "object" },
+        "current_hp": { "type": "integer" },
+        "current_mp": { "type": "integer" },
+        "notes": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "name", "level"]
+    },
+    "Power": {
+      "title": "Power",
+      "description": "A character power",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "power_type": { "type": "string" },
+        "description": { "type": "string" },
+        "requirement_text": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Private user profiles"
+    },
+    "/characters/{characterId}": {
+      "schema": "Character",
+      "description": "Character documents"
+    },
+    "/characters/{characterId}/powers/{powerId}": {
+      "schema": "Power",
+      "description": "Powers assigned to a character"
+    }
+  }
+}

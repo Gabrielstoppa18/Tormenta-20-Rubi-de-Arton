@@ -40,9 +40,12 @@ import { PowersList } from './components/PowersList';
 import { ClassDetails, RaceDetails, OriginDetails } from './components/CompendiumDetails';
 import { LevelUpChoice } from './components/LevelUpChoice';
 import { Auth } from './components/Auth';
-import { supabase, isSupabaseConfigured } from './lib/supabase';
+import Rules from './components/Rules';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { characterService } from './lib/character';
 import { compendiumService } from './lib/compendium';
+import { userService } from './lib/user';
 import type { Race, Class, Origin } from './types/database';
 
 // --- Components ---
@@ -334,7 +337,7 @@ export default function App() {
     loadCharacter
   } = useCharacter();
 
-  const [activeTab, setActiveTab] = useState<'geral' | 'combate' | 'pericias' | 'inventario' | 'grimorio' | 'compendio'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'combate' | 'pericias' | 'inventario' | 'grimorio' | 'compendio' | 'regras'>('geral');
   const [compendioTab, setCompendioTab] = useState<'classes' | 'races' | 'origins' | 'powers'>('powers');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   
@@ -345,7 +348,7 @@ export default function App() {
   const [activeVFX, setActiveVFX] = useState<VFXType | null>(null);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
   
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [characters, setCharacters] = useState<any[]>([]);
   const [currentCharacterId, setCurrentCharacterId] = useState<string | null>(null);
   const [showCreation, setShowCreation] = useState(false);
@@ -356,18 +359,17 @@ export default function App() {
   const [dbRaces, setDbRaces] = useState<Race[]>([]);
   const [dbOrigins, setDbOrigins] = useState<Origin[]>([]);
   const [loadingCompendium, setLoadingCompendium] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
-    // Check for active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      if (firebaseUser) {
+        userService.syncProfile(firebaseUser);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -407,7 +409,7 @@ export default function App() {
     if (!user) return;
     setLoadingCharacters(true);
     try {
-      const data = await characterService.getCharacters(user.id);
+      const data = await characterService.getCharacters(user.uid);
       setCharacters(data);
       if (data.length > 0 && !currentCharacterId) {
         // Auto-select first character for demo
@@ -421,7 +423,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await auth.signOut();
   };
 
   const selectCharacter = async (id: string) => {
@@ -459,6 +461,21 @@ export default function App() {
     setShowLevelUpModal(true);
   };
 
+  const handleSeedCompendium = async () => {
+    if (isSeeding) return;
+    setIsSeeding(true);
+    try {
+      await compendiumService.seedCompendium();
+      alert('Compêndio sincronizado com sucesso!');
+      loadCompendiumLists();
+    } catch (error) {
+      console.error('Error seeding compendium:', error);
+      alert('Erro ao sincronizar compêndio.');
+    } finally {
+      setIsSeeding(false);
+    }
+  };
+
   const tabs = [
     { id: 'geral', label: 'Geral', icon: <User size={18} /> },
     { id: 'combate', label: 'Combate', icon: <Sword size={18} /> },
@@ -466,6 +483,7 @@ export default function App() {
     { id: 'inventario', label: 'Inventário', icon: <Backpack size={18} /> },
     { id: 'grimorio', label: 'Grimório', icon: <Book size={18} /> },
     { id: 'compendio', label: 'Compêndio', icon: <Book size={18} /> },
+    { id: 'regras', label: 'Regras', icon: <Book size={18} /> },
   ] as const;
 
   if (!user) {
@@ -474,7 +492,7 @@ export default function App() {
 
   if (showCreation) {
     return <CharacterCreation 
-      userId={user.id} 
+      userId={user.uid} 
       onComplete={(id) => {
         setCurrentCharacterId(id);
         setShowCreation(false);
@@ -547,6 +565,13 @@ export default function App() {
         </nav>
 
         <div className="p-6 border-t border-gothic-gold/5 bg-gothic-card/20 space-y-4">
+          <button 
+            onClick={handleSeedCompendium}
+            disabled={isSeeding}
+            className="w-full py-2 border border-gothic-gold/20 text-[9px] font-bold text-gothic-gold/60 hover:bg-gothic-gold/10 hover:text-gothic-gold transition-all uppercase tracking-widest disabled:opacity-50"
+          >
+            {isSeeding ? 'Sincronizando...' : 'Sincronizar Compêndio'}
+          </button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-sm border border-gothic-gold/30 p-0.5">
               <img 
@@ -1107,6 +1132,8 @@ export default function App() {
               )}
             </div>
           )}
+
+          {activeTab === 'regras' && <Rules />}
         </div>
       </main>
 

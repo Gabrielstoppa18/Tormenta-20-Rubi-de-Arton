@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { auth, googleProvider } from '../lib/firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithPopup,
+  updateProfile
+} from 'firebase/auth';
 import { Shield, Sword, Mail, Lock, UserPlus, LogIn, AlertCircle, Chrome } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -11,38 +17,18 @@ export function Auth({ onSuccess }: AuthProps) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleGoogleLogin = async () => {
-    if (!isSupabaseConfigured) {
-      alert('Configuração do Supabase não encontrada! Por favor, adicione VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no menu Settings (ícone de engrenagem).');
-      return;
-    }
-
-    // Detect if inside iframe
-    const isIframe = window.self !== window.top;
-    
-    if (isIframe) {
-      const wantsNewTab = window.confirm('O login via Google costuma ser bloqueado dentro de editores (iframes). Deseja abrir o app em uma nova aba para logar com segurança?');
-      if (wantsNewTab) {
-        window.open(window.location.href, '_blank');
-        return;
-      }
-    }
-
     try {
       setLoading(true);
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-          skipBrowserRedirect: false // Changed to false to allow direct redirect if not in iframe
-        }
-      });
-      if (error) throw error;
+      setError(null);
+      const result = await signInWithPopup(auth, googleProvider);
+      onSuccess(result.user);
     } catch (error: any) {
-      console.error('Erro no login:', error);
+      console.error('Erro no login Google:', error);
       setError(`Erro ao entrar com Google: ${error.message}`);
     } finally {
       setLoading(false);
@@ -56,33 +42,22 @@ export function Auth({ onSuccess }: AuthProps) {
 
     try {
       if (isLogin) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        onSuccess(data.user);
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        onSuccess(result.user);
       } else {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: window.location.origin,
-          }
-        });
-        if (error) throw error;
-        
-        if (data.session) {
-          // Automatic login if email confirmation is disabled
-          onSuccess(data.user);
-        } else if (data.user) {
-          // Email confirmation required
-          alert('Cadastro realizado com sucesso! Verifique seu e-mail para confirmar a conta. O usuário já deve aparecer na aba "Authentication" do seu painel Supabase.');
-          setIsLogin(true);
+        if (password !== confirmPassword) {
+          throw new Error('As senhas não coincidem!');
         }
+
+        const result = await createUserWithEmailAndPassword(auth, email, password);
+        onSuccess(result.user);
       }
     } catch (err: any) {
-      setError(err.message || 'Ocorreu um erro na autenticação.');
+      let message = err.message;
+      if (err.code === 'auth/email-already-in-use') message = 'Este e-mail já está em uso.';
+      if (err.code === 'auth/invalid-credential') message = 'E-mail ou senha incorretos.';
+      if (err.code === 'auth/weak-password') message = 'A senha deve ter pelo menos 6 caracteres.';
+      setError(message || 'Ocorreu um erro na autenticação.');
     } finally {
       setLoading(false);
     }
@@ -148,6 +123,26 @@ export function Auth({ onSuccess }: AuthProps) {
             />
           </div>
 
+          {!isLogin && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="space-y-2"
+            >
+              <label className="text-[10px] font-bold text-gothic-gold uppercase tracking-widest flex items-center gap-2">
+                <Lock size={12} /> Confirmar Senha
+              </label>
+              <input 
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full bg-black/40 border border-gothic-gold/20 p-3 font-cinzel text-sm text-gothic-text focus:border-gothic-gold outline-none transition-colors"
+                placeholder="••••••••"
+              />
+            </motion.div>
+          )}
+
           <AnimatePresence>
             {error && (
               <motion.div 
@@ -201,16 +196,9 @@ export function Auth({ onSuccess }: AuthProps) {
             Desenvolvido para aventureiros de elite
           </p>
           
-          {!isSupabaseConfigured && (
-            <div className="p-2 bg-gothic-red/5 border border-gothic-red/20 text-[9px] text-gothic-red/60 uppercase tracking-tighter">
-              Aviso: Configuração do Supabase pendente no menu Settings.
-            </div>
-          )}
-          {isSupabaseConfigured && (
-            <div className="p-2 bg-gothic-gold/5 border border-gothic-gold/20 text-[9px] text-gothic-gold/40 uppercase tracking-tighter">
-              Supabase conectado. Verifique a aba "Authentication" no seu painel.
-            </div>
-          )}
+          <div className="p-2 bg-gothic-gold/5 border border-gothic-gold/20 text-[9px] text-gothic-gold/40 uppercase tracking-tighter">
+            Firebase conectado. Verifique a aba "Authentication" no seu console Firebase.
+          </div>
         </div>
       </motion.div>
     </div>

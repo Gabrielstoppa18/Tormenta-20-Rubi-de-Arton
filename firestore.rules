@@ -1,0 +1,130 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (auth.uid)
+    // Fields:
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: characters
+    // Document ID: characterId
+    // Fields:
+    //   - user_id: string (required, matches owner)
+    //   - name: string (required, 1-100 chars)
+    //   - race_id: string (optional)
+    //   - class_id: string (optional)
+    //   - origin_id: string (optional)
+    //   - level: number (required, 1-20)
+    //   - attributes_base: map (required)
+    //   - current_hp: number (optional)
+    //   - current_mp: number (optional)
+    //   - notes: string (optional, max 10000 chars)
+    //   - created_at: timestamp (required)
+    //   - updated_at: timestamp (required)
+    //
+    // Collection: characters/{characterId}/powers
+    // Document ID: powerId
+    // Fields:
+    //   - name: string (required)
+    //   - power_type: string (required)
+    //   - description: string (optional)
+    //   - requirement_text: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "gabrielstoppa@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'uid']) &&
+             data.email is string &&
+             data.uid is string;
+    }
+
+    function isValidCharacter(data) {
+      return data.keys().hasAll(['user_id', 'name', 'level']) &&
+             data.user_id is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.level is number && data.level >= 1 && data.level <= 20;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+    }
+
+    match /characters/{characterId} {
+      allow read: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && 
+                      request.resource.data.user_id == request.auth.uid && 
+                      isValidCharacter(request.resource.data);
+      allow update: if isAuthenticated() && 
+                      resource.data.user_id == request.auth.uid && 
+                      request.resource.data.user_id == request.auth.uid &&
+                      isValidCharacter(request.resource.data);
+      allow delete: if isAuthenticated() && (resource.data.user_id == request.auth.uid || isAdmin());
+
+      match /powers/{powerId} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && (get(/databases/$(database)/documents/characters/$(characterId)).data.user_id == request.auth.uid || isAdmin());
+      }
+    }
+
+    match /races/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /classes/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /origins/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /powers/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /class_powers/{id} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

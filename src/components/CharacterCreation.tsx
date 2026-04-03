@@ -14,6 +14,48 @@ interface CharacterCreationProps {
   userId: string;
 }
 
+// --- Constants ---
+
+const DEFAULT_CLASS_SKILLS: Record<string, string[][]> = {
+  arcanist: [['knowledge', 'diplomacy']],
+  warrior: [['fight'], ['animalHandling', 'athletics']],
+  barbarian: [['animalHandling', 'athletics', 'animalRide', 'initiative']],
+  buccaneer: [['fight'], ['acrobatics', 'athletics', 'acting', 'cheat']],
+  bard: [['acrobatics', 'animalRide', 'knowledge', 'diplomacy', 'cheat', 'stealth']],
+  ranger: [['fight'], ['animalHandling', 'athletics', 'animalRide', 'cure', 'fortitude', 'stealth']],
+  knight: [['animalHandling', 'athletics']],
+  cleric: [['knowledge', 'cure']],
+  druid: [['animalHandling', 'athletics', 'animalRide', 'knowledge']],
+  inventor: [['knowledge', 'cure', 'diplomacy', 'fortitude']],
+  rogue: [['acrobatics', 'athletics', 'acting', 'animalRide', 'knowledge', 'diplomacy', 'cheat', 'stealth']],
+  fighter: [['acrobatics', 'animalHandling', 'athletics', 'cheat']],
+  noble: [['diplomacy', 'intimidation'], ['animalHandling', 'acting', 'animalRide', 'knowledge']],
+  paladin: [['animalHandling', 'athletics']],
+};
+
+const DEFAULT_ORIGIN_BENEFITS: Record<string, any[]> = {
+  acolyte: [{ type: 'skills', name: 'religion' }, { type: 'skills', name: 'will' }],
+  animalFriend: [{ type: 'skills', name: 'animalHandling' }, { type: 'skills', name: 'survival' }],
+  artisan: [{ type: 'skills', name: 'craft' }, { type: 'skills', name: 'will' }],
+  aristocrat: [{ type: 'skills', name: 'diplomacy' }, { type: 'skills', name: 'nobility' }],
+  assistant: [{ type: 'skills', name: 'investigation' }, { type: 'skills', name: 'knowledge' }],
+  charlatan: [{ type: 'skills', name: 'cheat' }, { type: 'skills', name: 'thievery' }],
+  criminal: [{ type: 'skills', name: 'thievery' }, { type: 'skills', name: 'stealth' }],
+  gladiator: [{ type: 'skills', name: 'fight' }, { type: 'skills', name: 'intimidation' }],
+  hermit: [{ type: 'skills', name: 'nature' }, { type: 'skills', name: 'survival' }],
+  laborer: [{ type: 'skills', name: 'athletics' }, { type: 'skills', name: 'fortitude' }],
+  merchant: [{ type: 'skills', name: 'diplomacy' }, { type: 'skills', name: 'thievery' }],
+  miner: [{ type: 'skills', name: 'athletics' }, { type: 'skills', name: 'fortitude' }],
+  nomad: [{ type: 'skills', name: 'survival' }, { type: 'skills', name: 'perception' }],
+  sailor: [{ type: 'skills', name: 'athletics' }, { type: 'skills', name: 'reflexes' }],
+  soldier: [{ type: 'skills', name: 'fight' }, { type: 'skills', name: 'fortitude' }],
+  student: [{ type: 'skills', name: 'investigation' }, { type: 'skills', name: 'knowledge' }],
+  tavernKeeper: [{ type: 'skills', name: 'diplomacy' }, { type: 'skills', name: 'fortitude' }],
+  traveler: [{ type: 'skills', name: 'survival' }, { type: 'skills', name: 'knowledge' }],
+  venerated: [{ type: 'skills', name: 'religion' }, { type: 'skills', name: 'intuition' }],
+  wildChild: [{ type: 'skills', name: 'nature' }, { type: 'skills', name: 'survival' }],
+};
+
 export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCreationProps) {
   const [step, setStep] = useState(1);
   const [races, setRaces] = useState<Race[]>([]);
@@ -42,7 +84,8 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
         
         setRaces(r);
         setClasses(c);
-        setOrigins(o);
+        // Only allow Acolyte and Animal Friend as requested
+        setOrigins(o.filter(origin => ['acolyte', 'animalFriend'].includes(origin.id)));
         
         const p = await compendiumService.getPowers('Geral');
         setAvailablePowers(p);
@@ -104,20 +147,21 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
         if (formData.class_id === RoleName.arcanist) {
           role = ArcanistFactory.makeFromSerialized({ 
             name: RoleName.arcanist, 
-            selectedSkillsByGroup: [],
+            selectedSkillsByGroup: DEFAULT_CLASS_SKILLS.arcanist || [[]],
             path: { name: 'wizard', spells: ['arcaneArmor'] },
             initialSpells: ['arcaneArmor', 'magicMissile', 'shield']
           } as any);
         } else if (formData.class_id === RoleName.warrior) {
           role = RoleFactory.makeFromSerialized({ 
             name: RoleName.warrior, 
-            selectedSkillsByGroup: [],
+            selectedSkillsByGroup: DEFAULT_CLASS_SKILLS.warrior || [[]],
           } as any);
         } else {
           // For other classes, instantiate directly using Roles map from compendium
           const RoleClass = (Roles as any).get(formData.class_id);
           if (RoleClass) {
-            role = new RoleClass([]);
+            const defaultSkills = DEFAULT_CLASS_SKILLS[formData.class_id] || [[]];
+            role = new RoleClass(defaultSkills);
           }
         }
         
@@ -130,7 +174,7 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
       if (formData.origin_id) {
         const origin = OriginFactory.makeFromSerialized({ 
           name: formData.origin_id as any, 
-          chosenBenefits: [],
+          chosenBenefits: DEFAULT_ORIGIN_BENEFITS[formData.origin_id] || [],
           chosenAnimal: 'dog' // For AnimalsFriend
         } as any);
         builder.chooseOrigin(origin);
@@ -209,7 +253,7 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
           </button>
           <h1 className="font-cinzel text-4xl font-bold text-gothic-gold mb-2 tracking-tighter">Criação de Personagem</h1>
           <div className="h-1 w-32 bg-gothic-red mx-auto" />
-          <p className="text-gothic-text/40 text-xs uppercase tracking-[0.3em] mt-4">Passo {step} de 5</p>
+          <p className="text-gothic-text/40 text-xs uppercase tracking-[0.3em] mt-4">Passo {step} de 4</p>
         </header>
 
         <AnimatePresence mode="wait">
@@ -390,62 +434,6 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
                 <button onClick={() => setStep(3)} className="flex items-center gap-2 text-gothic-gold font-cinzel font-bold"><ChevronLeft size={18} /> VOLTAR</button>
                 <button 
                   disabled={!formData.origin_id}
-                  onClick={() => setStep(5)}
-                  className="flex items-center gap-2 px-8 py-3 bg-gothic-gold text-gothic-bg font-cinzel font-bold hover:bg-white transition-colors disabled:opacity-50"
-                >
-                  PRÓXIMO <ChevronRight size={18} />
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 5 && (
-            <motion.div 
-              key="step5"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-8"
-            >
-              <div className="bg-gothic-card p-8 border border-gothic-gold/20">
-                <label className="block font-cinzel text-sm text-gothic-gold mb-6 uppercase tracking-widest">Escolha seus Poderes Iniciais</label>
-                <p className="text-xs text-gothic-text/40 mb-6 italic">Algumas raças e origens permitem escolher poderes extras no nível 1.</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {availablePowers.length > 0 ? (
-                    availablePowers.map(power => (
-                      <button
-                        key={power.id}
-                        onClick={() => {
-                          const exists = formData.initial_powers.includes(power.id);
-                          if (exists) {
-                            setFormData({ ...formData, initial_powers: formData.initial_powers.filter(id => id !== power.id) });
-                          } else {
-                            setFormData({ ...formData, initial_powers: [...formData.initial_powers, power.id] });
-                          }
-                        }}
-                        className={cn(
-                          "p-4 text-left border transition-all duration-300",
-                          formData.initial_powers.includes(power.id)
-                            ? "bg-gothic-gold/10 border-gothic-gold" 
-                            : "bg-black/20 border-gothic-gold/10 hover:border-gothic-gold/40"
-                        )}
-                      >
-                        <h4 className="font-cinzel text-sm font-bold text-gothic-gold">{power.name}</h4>
-                        <p className="text-[10px] text-gothic-text/60 line-clamp-2">{power.description}</p>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="col-span-full py-8 text-center border border-dashed border-gothic-gold/20">
-                      <p className="font-cinzel text-gothic-text/40">Nenhum poder disponível no compêndio.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex justify-between">
-                <button onClick={() => setStep(4)} className="flex items-center gap-2 text-gothic-gold font-cinzel font-bold"><ChevronLeft size={18} /> VOLTAR</button>
-                <button 
                   onClick={handleCreate}
                   className="flex items-center gap-2 px-8 py-3 bg-gothic-red text-white font-cinzel font-bold hover:bg-red-600 transition-colors shadow-[0_0_20px_rgba(139,0,0,0.4)]"
                 >
