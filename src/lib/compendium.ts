@@ -10,12 +10,15 @@ import {
   getDoc, 
   getDocs, 
   setDoc, 
+  deleteDoc,
   query, 
   where, 
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Race, Class, Origin, Power, ClassPower } from '../types/database';
+import type { Race, Class, Origin, Power, ClassPower, Character } from '../types/database';
+export type { Race, Class, Origin, Power, ClassPower, Character };
+import { RACES, POWERS, ORIGINS } from '../data/t20-data';
 
 export const Roles = {
   getAll: () => [
@@ -71,22 +74,16 @@ export const compendiumService = {
         return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Race));
       }
 
-      // Fallback to library
-      const races = Races.getAll();
-      return races.map(r => {
-        const raceName = (r as any).raceName;
-        const name = Translator.getRaceTranslation(raceName);
-        const abilities = (r as any).abilities ? Object.values((r as any).abilities).map((a: any) => a.name).join(', ') : '';
-        
-        return {
-          id: raceName,
-          name,
-          description: `Habilidades de Raça: ${abilities}`,
-          raw_data: sanitizeForFirestore(r) || {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-      });
+      // Fallback to local data
+      return Object.entries(RACES).map(([id, r]) => ({
+        id,
+        name: r.name,
+        description: r.description,
+        abilities: r.abilities.join(', '),
+        raw_data: sanitizeForFirestore(r) || {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
     } catch (error) {
       console.error('Error fetching races:', error);
       return [];
@@ -131,20 +128,16 @@ export const compendiumService = {
         return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Origin));
       }
 
-      const origins = Origins.getAll();
-      return origins.map(o => {
-        const originName = (o as any).originName;
-        const name = Translator.getOriginTranslation(originName);
-        
-        return {
-          id: originName,
-          name,
-          description: `Origem: ${name}. Concede perícias e poderes únicos.`,
-          raw_data: sanitizeForFirestore(o) || {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-      });
+      // Fallback to local data
+      return Object.entries(ORIGINS).map(([id, o]) => ({
+        id,
+        name: o.name,
+        description: o.description,
+        benefits: o.benefits.join(', '),
+        raw_data: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
     } catch (error) {
       console.error('Error fetching origins:', error);
       return [];
@@ -162,12 +155,13 @@ export const compendiumService = {
         return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Power));
       }
 
-      const powerNames = Object.keys(GeneralPowerFactory.generalPowerClasses);
-      return powerNames.map(name => ({
-        id: name,
-        name: Translator.getPowerTranslation(name as any) || name,
-        power_type: 'Geral',
-        description: `Poder Geral: ${Translator.getPowerTranslation(name as any) || name}`,
+      // Fallback to local data
+      return POWERS.map(p => ({
+        id: p.name.toLowerCase().replace(/\s+/g, '_'),
+        name: p.name,
+        power_type: p.requirements.some(r => r.startsWith('Raça:')) ? 'Raça' : 'Geral',
+        description: p.description,
+        requirements: p.requirements.join(', '),
         raw_data: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -238,16 +232,32 @@ export const compendiumService = {
   async seedCompendium() {
     console.log('Starting compendium seeding...');
     
-    // Seed Races
-    const races = await this.getRaces();
-    for (const race of races) {
+    // Seed Races (Always use local RACES for seeding to ensure descriptions/abilities are updated)
+    const localRaces = Object.entries(RACES).map(([id, r]) => ({
+      id,
+      name: r.name,
+      description: r.description,
+      abilities: r.abilities.join(', '),
+      raw_data: sanitizeForFirestore(r) || {},
+    }));
+
+    for (const race of localRaces) {
       await setDoc(doc(db, 'races', race.id), {
         ...race,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       });
     }
-    console.log(`Seeded ${races.length} races.`);
+
+    // Delete races that are no longer in local data
+    const existingRaces = await getDocs(collection(db, 'races'));
+    for (const raceDoc of existingRaces.docs) {
+      if (!RACES[raceDoc.id]) {
+        await deleteDoc(doc(db, 'races', raceDoc.id));
+        console.log(`Deleted race ${raceDoc.id} from Firestore.`);
+      }
+    }
+    console.log(`Seeded ${localRaces.length} races.`);
 
     // Seed Classes
     const classes = await this.getClasses();
@@ -260,27 +270,67 @@ export const compendiumService = {
     }
     console.log(`Seeded ${classes.length} classes.`);
 
-    // Seed Origins
-    const origins = await this.getOrigins();
-    for (const origin of origins) {
+    // Seed Origins (Always use local ORIGINS for seeding)
+    const localOrigins = Object.entries(ORIGINS).map(([id, o]) => ({
+      id,
+      name: o.name,
+      description: o.description,
+      benefits: o.benefits.join(', '),
+      raw_data: {},
+    }));
+
+    for (const origin of localOrigins) {
       await setDoc(doc(db, 'origins', origin.id), {
         ...origin,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       });
     }
-    console.log(`Seeded ${origins.length} origins.`);
 
-    // Seed General Powers
-    const powers = await this.getPowers();
-    for (const power of powers) {
+    // Delete origins that are no longer in local data
+    const existingOrigins = await getDocs(collection(db, 'origins'));
+    for (const originDoc of existingOrigins.docs) {
+      if (!ORIGINS[originDoc.id]) {
+        await deleteDoc(doc(db, 'origins', originDoc.id));
+        console.log(`Deleted origin ${originDoc.id} from Firestore.`);
+      }
+    }
+    console.log(`Seeded ${localOrigins.length} origins.`);
+
+    // Seed Powers (Always use local POWERS for seeding)
+    const localPowers = POWERS.map(p => {
+      let powerType = 'Geral';
+      if (p.requirements.some(r => r.startsWith('Raça:'))) powerType = 'Raça';
+      if (p.requirements.some(r => r.startsWith('Origem:'))) powerType = 'Origem';
+
+      return {
+        id: p.name.toLowerCase().replace(/\s+/g, '_'),
+        name: p.name,
+        power_type: powerType,
+        description: p.description,
+        requirements: p.requirements.join(', '),
+        raw_data: {},
+      };
+    });
+
+    for (const power of localPowers) {
       await setDoc(doc(db, 'powers', power.id), {
         ...power,
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       });
     }
-    console.log(`Seeded ${powers.length} general powers.`);
+
+    // Delete powers that are no longer in local data
+    const existingPowers = await getDocs(collection(db, 'powers'));
+    const localPowerIds = new Set(localPowers.map(p => p.id));
+    for (const powerDoc of existingPowers.docs) {
+      if (!localPowerIds.has(powerDoc.id)) {
+        await deleteDoc(doc(db, 'powers', powerDoc.id));
+        console.log(`Deleted power ${powerDoc.id} from Firestore.`);
+      }
+    }
+    console.log(`Seeded ${localPowers.length} powers.`);
 
     console.log('Compendium seeding complete!');
   }

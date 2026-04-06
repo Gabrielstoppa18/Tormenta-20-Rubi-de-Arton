@@ -37,6 +37,7 @@ interface CharacterState {
   spells: T20Spell[];
   inventory: T20InventoryItem[];
   defenseBonus: number;
+  isLoaded: boolean;
 }
 
 interface CharacterContextType {
@@ -65,27 +66,26 @@ interface CharacterContextType {
   levelDown: () => void;
   loadCharacter: (id: string) => Promise<void>;
   saveCharacter: () => Promise<void>;
+  unloadCharacter: () => void;
 }
 
 const CharacterContext = createContext<CharacterContextType | undefined>(undefined);
 
 export function CharacterProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<CharacterState>({
-    name: "Sir Alistair",
-    race: "Humano",
-    class: "Paladino",
+    name: "",
+    race: "",
+    class: "",
     level: 1,
-    deity: "Khalmyr",
-    attributes: { for: 4, des: 2, con: 2, int: 1, sab: 1, car: 3 },
-    currentPV: 22,
-    currentPM: 3,
+    deity: "",
+    attributes: { for: 0, des: 0, con: 0, int: 0, sab: 0, car: 0 },
+    currentPV: 0,
+    currentPM: 0,
     powers: [],
     spells: [],
-    inventory: [
-      { id: '1', name: "Espada Longa", type: "Arma Marcial", weight: 1.5, cost: "15 T$", quantity: 1 },
-      { id: '2', name: "Armadura de Couro", type: "Armadura Leve", weight: 7, cost: "10 T$", quantity: 1 }
-    ],
+    inventory: [],
     defenseBonus: 0,
+    isLoaded: false,
   });
 
   const modifiers = {
@@ -113,8 +113,14 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
   const takeDamage = (amount: number) => setState(s => ({ ...s, currentPV: s.currentPV - amount }));
   const spendPM = (amount: number) => setState(s => ({ ...s, currentPM: s.currentPM - amount }));
   
-  const addPower = (power: T20Power) => setState(s => ({ ...s, powers: [...s.powers, power] }));
-  const removePower = (powerName: string) => setState(s => ({ ...s, powers: s.powers.filter(p => p.name !== powerName) }));
+  const addPower = (power: T20Power) => setState(s => ({ 
+    ...s, 
+    powers: [...s.powers, { ...power, id: power.id || crypto.randomUUID() }] 
+  }));
+  const removePower = (powerId: string) => setState(s => ({ 
+    ...s, 
+    powers: s.powers.filter(p => (p.id || p.name) !== powerId) 
+  }));
   const addSpell = (spell: T20Spell) => setState(s => ({ ...s, spells: [...s.spells, spell] }));
   const removeSpell = (spellName: string) => setState(s => ({ ...s, spells: s.spells.filter(sp => sp.name !== spellName) }));
   
@@ -201,21 +207,24 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
       const dbPowers = await characterService.getCharacterPowers(id);
       
       let inventory: T20InventoryItem[] = [];
+      let deity = 'Khalmyr';
       try {
-        if (char.notes && char.notes.startsWith('INVENTORY_JSON:')) {
-          inventory = JSON.parse(char.notes.replace('INVENTORY_JSON:', ''));
+        if (char.notes && char.notes.startsWith('CHAR_DATA_JSON:')) {
+          const charData = JSON.parse(char.notes.replace('CHAR_DATA_JSON:', ''));
+          inventory = charData.inventory || [];
+          deity = charData.deity || 'Khalmyr';
         }
       } catch (e) {
-        console.error('Error parsing inventory from notes:', e);
+        console.error('Error parsing character data from notes:', e);
       }
 
       // Map DB character to context state
       setState({
         name: char.name,
-        race: char.race_id || 'Humano',
-        class: char.class_id || 'Guerreiro',
+        race: char.race_id || 'human',
+        class: char.class_id || 'warrior',
         level: char.level,
-        deity: 'Khalmyr', // Default for now
+        deity: deity,
         attributes: {
           for: char.attributes_base.for || 0,
           des: char.attributes_base.des || 0,
@@ -227,6 +236,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
         currentPV: char.current_hp || 0,
         currentPM: char.current_mp || 0,
         powers: dbPowers.map(dp => ({
+          id: dp.id,
           name: dp.power?.name || 'Poder Desconhecido',
           description: dp.power?.description || '',
           requirements: dp.power?.requirement_text ? [dp.power.requirement_text] : []
@@ -237,16 +247,39 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
           { id: '2', name: "Armadura de Couro", type: "Armadura Leve", weight: 7, cost: "10 T$", quantity: 1 }
         ],
         defenseBonus: 0,
+        isLoaded: true,
       });
     } catch (error) {
       console.error('Error loading character into context:', error);
     }
   }, []);
 
+  const unloadCharacter = useCallback(() => {
+    setCurrentCharacterId(null);
+    setState({
+      name: "",
+      race: "",
+      class: "",
+      level: 1,
+      deity: "",
+      attributes: { for: 0, des: 0, con: 0, int: 0, sab: 0, car: 0 },
+      currentPV: 0,
+      currentPM: 0,
+      powers: [],
+      spells: [],
+      inventory: [],
+      defenseBonus: 0,
+      isLoaded: false,
+    });
+  }, []);
+
   const saveCharacter = async () => {
     if (!currentCharacterId) return;
     try {
-      const inventoryJson = `INVENTORY_JSON:${JSON.stringify(state.inventory)}`;
+      const charDataJson = `CHAR_DATA_JSON:${JSON.stringify({
+        inventory: state.inventory,
+        deity: state.deity
+      })}`;
       await characterService.updateCharacter(currentCharacterId, {
         name: state.name,
         race_id: state.race,
@@ -255,7 +288,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
         attributes_base: state.attributes,
         current_hp: state.currentPV,
         current_mp: state.currentPM,
-        notes: inventoryJson,
+        notes: charDataJson,
       });
       console.log('Character saved successfully');
     } catch (error) {
@@ -290,6 +323,7 @@ export function CharacterProvider({ children }: { children: ReactNode }) {
       levelDown,
       loadCharacter,
       saveCharacter,
+      unloadCharacter,
     }}>
       {children}
     </CharacterContext.Provider>

@@ -22,6 +22,7 @@ import {
   Trophy,
   ChevronUp,
   ChevronDown,
+  ChevronRight,
   Settings,
   PlusCircle,
   Trash2,
@@ -334,7 +335,8 @@ export default function App() {
     levelUp,
     levelDown,
     saveCharacter,
-    loadCharacter
+    loadCharacter,
+    unloadCharacter
   } = useCharacter();
 
   const [activeTab, setActiveTab] = useState<'geral' | 'combate' | 'pericias' | 'inventario' | 'grimorio' | 'compendio' | 'regras'>('geral');
@@ -366,11 +368,13 @@ export default function App() {
       setUser(firebaseUser);
       if (firebaseUser) {
         userService.syncProfile(firebaseUser);
+      } else {
+        unloadCharacter();
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [unloadCharacter]);
 
   useEffect(() => {
     if (user) {
@@ -496,9 +500,80 @@ export default function App() {
       onComplete={(id) => {
         setCurrentCharacterId(id);
         setShowCreation(false);
+        loadUserCharacters();
+        loadCharacter(id);
       }} 
       onCancel={() => setShowCreation(false)}
     />;
+  }
+
+  if (!state.isLoaded) {
+    return (
+      <div className="flex h-screen bg-gothic-bg items-center justify-center p-8">
+        <div className="max-w-md w-full space-y-8 text-center">
+          <header>
+            <h1 className="font-cinzel text-4xl font-bold text-gothic-gold mb-2 tracking-tighter">
+              TORMENTA <span className="text-gothic-red">20</span>
+            </h1>
+            <p className="text-xs uppercase tracking-[0.3em] text-gothic-text/30">Arthon Gothic Edition</p>
+          </header>
+
+          <div className="bg-gothic-card border border-gothic-gold/20 p-8 space-y-6">
+            <h2 className="font-cinzel text-xl text-gothic-gold uppercase tracking-widest">Seus Personagens</h2>
+            
+            {loadingCharacters ? (
+              <div className="py-12 flex flex-col items-center gap-4">
+                <div className="w-8 h-8 border-2 border-gothic-gold/20 border-t-gothic-gold rounded-full animate-spin" />
+                <p className="font-cinzel text-[10px] text-gothic-gold/40 uppercase tracking-widest">Consultando os arquivos...</p>
+              </div>
+            ) : characters.length === 0 ? (
+              <div className="py-8 space-y-4">
+                <p className="text-gothic-text/40 text-sm italic">Você ainda não possui fichas em Arthon.</p>
+                <button 
+                  onClick={() => setShowCreation(true)}
+                  className="w-full py-4 bg-gothic-gold text-gothic-bg font-cinzel font-bold hover:bg-white transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+                >
+                  <PlusCircle size={18} /> Criar Primeira Ficha
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-64 overflow-y-auto gothic-scroll pr-2">
+                {characters.map(char => (
+                  <button
+                    key={char.id}
+                    onClick={() => selectCharacter(char.id)}
+                    className="w-full p-4 bg-black/40 border border-gothic-gold/10 hover:border-gothic-gold/40 text-left group transition-all"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h3 className="font-cinzel text-gothic-gold group-hover:tracking-widest transition-all">{char.name}</h3>
+                        <p className="text-[9px] text-gothic-text/40 uppercase tracking-widest">
+                          {RACES[char.race_id]?.name || char.race_id} {CLASSES[char.class_id]?.name || char.class_id} • Nível {char.level}
+                        </p>
+                      </div>
+                      <ChevronRight size={16} className="text-gothic-gold/20 group-hover:text-gothic-gold transition-colors" />
+                    </div>
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setShowCreation(true)}
+                  className="w-full py-3 border border-dashed border-gothic-gold/20 text-gothic-gold/40 hover:border-gothic-gold hover:text-gothic-gold transition-all font-cinzel text-[10px] uppercase tracking-widest"
+                >
+                  + Nova Ficha
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button 
+            onClick={handleLogout}
+            className="text-gothic-red/40 hover:text-gothic-red transition-colors font-cinzel text-[10px] uppercase tracking-widest"
+          >
+            Sair de Arthon
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -539,7 +614,12 @@ export default function App() {
                     currentCharacterId === char.id ? "text-gothic-gold bg-gothic-gold/5" : "text-gothic-text/40 hover:text-gothic-gold/60"
                   )}
                 >
-                  {char.name}
+                  <div className="flex flex-col">
+                    <span>{char.name}</span>
+                    <span className="text-[8px] opacity-50 uppercase tracking-tighter">
+                      {RACES[char.race_id]?.name || char.race_id} {CLASSES[char.class_id]?.name || char.class_id}
+                    </span>
+                  </div>
                 </button>
               ))
             )}
@@ -565,13 +645,15 @@ export default function App() {
         </nav>
 
         <div className="p-6 border-t border-gothic-gold/5 bg-gothic-card/20 space-y-4">
-          <button 
-            onClick={handleSeedCompendium}
-            disabled={isSeeding}
-            className="w-full py-2 border border-gothic-gold/20 text-[9px] font-bold text-gothic-gold/60 hover:bg-gothic-gold/10 hover:text-gothic-gold transition-all uppercase tracking-widest disabled:opacity-50"
-          >
-            {isSeeding ? 'Sincronizando...' : 'Sincronizar Compêndio'}
-          </button>
+          {user?.email === 'gabrielstoppa@gmail.com' && (
+            <button 
+              onClick={handleSeedCompendium}
+              disabled={isSeeding}
+              className="w-full py-2 border border-gothic-gold/20 text-[9px] font-bold text-gothic-gold/60 hover:bg-gothic-gold/10 hover:text-gothic-gold transition-all uppercase tracking-widest disabled:opacity-50"
+            >
+              {isSeeding ? 'Sincronizando...' : 'Sincronizar Compêndio'}
+            </button>
+          )}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-sm border border-gothic-gold/30 p-0.5">
               <img 
@@ -583,15 +665,25 @@ export default function App() {
             </div>
             <div className="flex-1 overflow-hidden">
               <p className="font-cinzel text-xs font-bold text-gothic-text truncate">{state.name}</p>
-              <p className="text-[10px] text-gothic-gold/60 italic truncate">{state.race} {state.class}</p>
+              <p className="text-[10px] text-gothic-gold/60 italic truncate">
+                {RACES[state.race]?.name || state.race} {CLASSES[state.class]?.name || state.class}
+              </p>
             </div>
           </div>
-          <button 
-            onClick={handleLogout}
-            className="w-full py-2 border border-gothic-red/20 text-[9px] font-bold text-gothic-red/60 hover:bg-gothic-red/10 hover:text-gothic-red transition-all uppercase tracking-widest"
-          >
-            Sair de Arthon
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button 
+              onClick={unloadCharacter}
+              className="py-2 border border-gothic-gold/20 text-[9px] font-bold text-gothic-gold/60 hover:bg-gothic-gold/10 hover:text-gothic-gold transition-all uppercase tracking-widest"
+            >
+              Trocar Ficha
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="py-2 border border-gothic-red/20 text-[9px] font-bold text-gothic-red/60 hover:bg-gothic-red/10 hover:text-gothic-red transition-all uppercase tracking-widest"
+            >
+              Sair
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -660,7 +752,7 @@ export default function App() {
                       onChange={(e) => setRace(e.target.value)}
                       className="w-full bg-black/40 border border-gothic-gold/20 p-3 font-cinzel text-sm text-gothic-text focus:border-gothic-gold outline-none transition-colors"
                     >
-                      {Object.keys(RACES).map(r => <option key={r} value={r} className="bg-gothic-card">{r}</option>)}
+                      {Object.entries(RACES).map(([id, r]) => <option key={id} value={id} className="bg-gothic-card">{r.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -670,7 +762,7 @@ export default function App() {
                       onChange={(e) => setClass(e.target.value)}
                       className="w-full bg-black/40 border border-gothic-gold/20 p-3 font-cinzel text-sm text-gothic-text focus:border-gothic-gold outline-none transition-colors"
                     >
-                      {Object.keys(CLASSES).map(c => <option key={c} value={c} className="bg-gothic-card">{c}</option>)}
+                      {Object.entries(CLASSES).map(([id, c]) => <option key={id} value={id} className="bg-gothic-card">{c.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -680,7 +772,7 @@ export default function App() {
                       onChange={(e) => setDeity(e.target.value)}
                       className="w-full bg-black/40 border border-gothic-gold/20 p-3 font-cinzel text-sm text-gothic-text focus:border-gothic-gold outline-none transition-colors"
                     >
-                      {Object.keys(DEITIES).map(d => <option key={d} value={d} className="bg-gothic-card">{d}</option>)}
+                      {Object.entries(DEITIES).map(([id, d]) => <option key={id} value={id} className="bg-gothic-card">{d.name}</option>)}
                     </select>
                   </div>
                 </div>
@@ -734,9 +826,9 @@ export default function App() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {state.powers.map((power) => (
-                    <div key={power.name} className="p-4 bg-gothic-card/40 border border-gothic-gold/10 relative group">
+                    <div key={power.id || power.name} className="p-4 bg-gothic-card/40 border border-gothic-gold/10 relative group">
                       <button 
-                        onClick={() => removePower(power.name)}
+                        onClick={() => removePower(power.id || power.name)}
                         className="absolute top-2 right-2 text-gothic-red/40 hover:text-gothic-red opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Trash2 size={14} />

@@ -65,6 +65,7 @@ export function LevelUpChoice({ onComplete, onCancel }: LevelUpChoiceProps) {
     if (!selectedPower) return;
     
     addPower({
+      id: selectedPower.id,
       name: selectedPower.name,
       description: selectedPower.description || '',
       requirements: selectedPower.requirement_text ? [selectedPower.requirement_text] : []
