@@ -16,9 +16,9 @@ import {
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { Race, Class, Origin, Power, ClassPower, Character } from '../types/database';
-export type { Race, Class, Origin, Power, ClassPower, Character };
-import { RACES, POWERS, ORIGINS } from '../data/t20-data';
+import type { Race, Class, Origin, Power, ClassPower, Character, Spell } from '../types/database';
+export type { Race, Class, Origin, Power, ClassPower, Character, Spell };
+import { RACES, POWERS, ORIGINS, SPELLS, T20Spell } from '../data/t20-data';
 
 export const Roles = {
   getAll: () => [
@@ -65,6 +65,11 @@ const sanitizeForFirestore = (data: any): any => {
   return data;
 };
 
+import classesData from '../data/rules/classes.rules.json';
+import { ClassRule } from './rules/types';
+
+const classesRules = classesData as ClassRule[];
+
 export const compendiumService = {
   async getRaces(): Promise<Race[]> {
     try {
@@ -98,7 +103,7 @@ export const compendiumService = {
       }
 
       const roles = Roles.getAll();
-      return roles.map(r => {
+      const baseClasses = roles.map(r => {
         const roleName = (r as any).roleName;
         const name = Translator.getRoleTranslation(roleName);
         const proficiencies = (r as any).proficiencies ? (r as any).proficiencies.join(', ') : '';
@@ -115,6 +120,31 @@ export const compendiumService = {
           updated_at: new Date().toISOString()
         };
       });
+
+      // Merge with JSON rules
+      const mergedClasses = [...baseClasses];
+      classesRules.forEach(rule => {
+        const index = mergedClasses.findIndex(c => c.id.toLowerCase() === rule.id.toLowerCase());
+        const mappedClass = {
+          id: rule.id,
+          name: rule.name,
+          description: `Regras carregadas de ${rule.id}.rules.json. PV: ${rule.initialPV}/${rule.pvPerLevel}. PM: ${rule.pmPerLevel}.`,
+          hp_initial: rule.initialPV,
+          hp_per_level: rule.pvPerLevel,
+          mana_per_level: rule.pmPerLevel,
+          raw_data: rule,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        if (index >= 0) {
+          mergedClasses[index] = mappedClass;
+        } else {
+          mergedClasses.push(mappedClass);
+        }
+      });
+
+      return mergedClasses;
     } catch (error) {
       console.error('Error fetching classes:', error);
       return [];
@@ -151,23 +181,69 @@ export const compendiumService = {
         q = query(collection(db, 'powers'), where('power_type', '==', type));
       }
       const querySnapshot = await getDocs(q);
+      let powers: Power[] = [];
       if (!querySnapshot.empty) {
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Power));
+        powers = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Power));
+      } else {
+        // Fallback to local data
+        powers = POWERS.map(p => {
+          let powerType = 'Geral';
+          if (p.requirements.some(r => r.startsWith('Raça:'))) powerType = 'Raça';
+          else if (p.requirements.some(r => r.startsWith('Origem:'))) powerType = 'Origem';
+          else if (p.requirements.some(r => r.startsWith('Classe:'))) powerType = 'Classe';
+          else if (p.requirements.some(r => r.startsWith('Divindade:'))) powerType = 'Concedido';
+
+          return {
+            id: p.name.toLowerCase().replace(/\s+/g, '_'),
+            name: p.name,
+            power_type: powerType,
+            description: p.description,
+            requirement_text: p.requirements.join(', '),
+            raw_data: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        });
       }
 
-      // Fallback to local data
-      return POWERS.map(p => ({
-        id: p.name.toLowerCase().replace(/\s+/g, '_'),
-        name: p.name,
-        power_type: p.requirements.some(r => r.startsWith('Raça:')) ? 'Raça' : 'Geral',
-        description: p.description,
-        requirements: p.requirements.join(', '),
-        raw_data: {},
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
+      // Ensure uniqueness by ID
+      return Array.from(new Map(powers.map(p => [p.id, p])).values());
     } catch (error) {
       console.error('Error fetching powers:', error);
+      return [];
+    }
+  },
+
+  async getSpells(): Promise<Spell[]> {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'spells'));
+      let spells: Spell[] = [];
+      if (!querySnapshot.empty) {
+        spells = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Spell));
+      } else {
+        // Fallback to local data
+        spells = SPELLS.map(s => ({
+          id: s.name.toLowerCase().replace(/\s+/g, '_'),
+          name: s.name,
+          circle: s.circle,
+          school: s.school,
+          description: s.description,
+          type: s.type,
+          execution: s.execution || '',
+          range: s.range || '',
+          target: s.target || '',
+          duration: s.duration || '',
+          resistance: s.resistance,
+          enhancements: s.enhancements,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+      }
+
+      // Ensure uniqueness by name (since spells use name as key in some places)
+      return Array.from(new Map(spells.map(s => [s.name, s])).values());
+    } catch (error) {
+      console.error('Error fetching spells:', error);
       return [];
     }
   },
@@ -301,7 +377,9 @@ export const compendiumService = {
     const localPowers = POWERS.map(p => {
       let powerType = 'Geral';
       if (p.requirements.some(r => r.startsWith('Raça:'))) powerType = 'Raça';
-      if (p.requirements.some(r => r.startsWith('Origem:'))) powerType = 'Origem';
+      else if (p.requirements.some(r => r.startsWith('Origem:'))) powerType = 'Origem';
+      else if (p.requirements.some(r => r.startsWith('Classe:'))) powerType = 'Classe';
+      else if (p.requirements.some(r => r.startsWith('Divindade:'))) powerType = 'Concedido';
 
       return {
         id: p.name.toLowerCase().replace(/\s+/g, '_'),
@@ -319,6 +397,25 @@ export const compendiumService = {
         created_at: serverTimestamp(),
         updated_at: serverTimestamp()
       });
+
+      // If it's a class power, also link it in class_powers collection
+      if (power.power_type === 'Classe') {
+        const classMatch = power.requirements.match(/Classe: ([^,]+)/);
+        if (classMatch) {
+          const className = classMatch[1].trim();
+          // Find the class ID (we assume it's the roleName or similar)
+          const targetClass = classes.find(c => c.name === className);
+          if (targetClass) {
+            await setDoc(doc(db, 'class_powers', `${targetClass.id}_${power.id}`), {
+              class_id: targetClass.id,
+              power_id: power.id,
+              level_required: 1, // Default to 1 if not specified
+              is_choice: true,
+              power: power // Denormalize for easier fetching
+            });
+          }
+        }
+      }
     }
 
     // Delete powers that are no longer in local data

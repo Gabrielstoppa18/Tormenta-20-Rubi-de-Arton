@@ -42,6 +42,36 @@
         "description": { "type": "string" },
         "requirement_text": { "type": "string" }
       }
+    },
+    "Group": {
+      "title": "Group",
+      "description": "A party of characters",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "owner_id": { "type": "string" },
+        "members": { "type": "array", "items": { "type": "string" } },
+        "invite_code": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "owner_id", "members"]
+    },
+    "Roll": {
+      "title": "Roll",
+      "description": "A dice roll result",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "character_name": { "type": "string" },
+        "group_id": { "type": "string" },
+        "label": { "type": "string" },
+        "result": { "type": "integer" },
+        "bonus": { "type": "integer" },
+        "is_critical": { "type": "boolean" },
+        "is_fail": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "character_name", "group_id", "result"]
     }
   },
   "firestore": {
@@ -56,6 +86,14 @@
     "/characters/{characterId}/powers/{powerId}": {
       "schema": "Power",
       "description": "Powers assigned to a character"
+    },
+    "/groups/{groupId}": {
+      "schema": "Group",
+      "description": "Party groups"
+    },
+    "/rolls/{rollId}": {
+      "schema": "Roll",
+      "description": "Dice roll logs"
     }
   }
 }

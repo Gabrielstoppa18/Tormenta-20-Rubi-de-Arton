@@ -60,6 +60,23 @@ export type ClassPower = {
   power?: Power; // Joined data
 };
 
+export type Spell = {
+  id: string;
+  name: string;
+  circle: number;
+  school: string;
+  execution: string;
+  range: string;
+  target: string;
+  duration: string;
+  resistance?: string;
+  description: string;
+  type: "Arcana" | "Divina" | "Universal";
+  enhancements?: { cost: number; description: string }[];
+  created_at: string;
+  updated_at: string;
+};
+
 export type Character = {
   id: string;
   user_id: string;
@@ -71,9 +88,32 @@ export type Character = {
   attributes_base: Record<string, number>;
   current_hp?: number;
   current_mp?: number;
+  group_id?: string;
   notes?: string;
   created_at: string;
   updated_at: string;
+};
+
+export type Group = {
+  id: string;
+  name: string;
+  owner_id: string;
+  members: string[];
+  invite_code: string;
+  created_at: any;
+};
+
+export type Roll = {
+  id: string;
+  user_id: string;
+  character_name: string;
+  group_id: string;
+  label: string;
+  result: number;
+  bonus: number;
+  is_critical: boolean;
+  is_fail: boolean;
+  created_at: any;
 };
 
 export type CharacterPower = {
@@ -120,6 +160,11 @@ export interface Database {
         Row: CharacterPower;
         Insert: Partial<CharacterPower>;
         Update: Partial<CharacterPower>;
+      };
+      spells: {
+        Row: Spell;
+        Insert: Partial<Spell>;
+        Update: Partial<Spell>;
       };
     };
     Views: {

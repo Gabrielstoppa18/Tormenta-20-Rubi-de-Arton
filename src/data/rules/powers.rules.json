@@ -1,0 +1,140 @@
+[
+  {
+    "id": "ataque-especial",
+    "name": "Ataque Especial",
+    "category": "classe",
+    "source": "guerreiro",
+    "powerType": "habilidade-fixa",
+    "summary": "Habilidade fixa do guerreiro no 1º nível. Permite melhorar ataques mediante gasto de PM, conforme regra da classe.",
+    "requirements": [],
+    "effects": [
+      {
+        "type": "classFixedAbility",
+        "level": 1
+      }
+    ],
+    "repeatable": false
+  },
+  {
+    "id": "durao",
+    "name": "Durão",
+    "category": "classe",
+    "source": "guerreiro",
+    "powerType": "habilidade-fixa",
+    "summary": "Habilidade fixa do guerreiro no 3º nível, ligada à resistência em combate.",
+    "requirements": [
+      [
+        {
+          "type": "classLevel",
+          "classId": "guerreiro",
+          "min": 3
+        }
+      ]
+    ],
+    "effects": [
+      {
+        "type": "classFixedAbility",
+        "level": 3
+      }
+    ],
+    "repeatable": false
+  },
+  {
+    "id": "ataque-extra",
+    "name": "Ataque Extra",
+    "category": "classe",
+    "source": "guerreiro",
+    "powerType": "habilidade-fixa",
+    "summary": "Habilidade fixa do guerreiro no 6º nível, ligada à realização de ataque adicional.",
+    "requirements": [
+      [
+        {
+          "type": "classLevel",
+          "classId": "guerreiro",
+          "min": 6
+        }
+      ]
+    ],
+    "effects": [
+      {
+        "type": "classFixedAbility",
+        "level": 6
+      }
+    ],
+    "repeatable": false
+  },
+  {
+    "id": "campeao",
+    "name": "Campeão",
+    "category": "classe",
+    "source": "guerreiro",
+    "powerType": "habilidade-fixa",
+    "summary": "Habilidade fixa do guerreiro no 20º nível.",
+    "requirements": [
+      [
+        {
+          "type": "classLevel",
+          "classId": "guerreiro",
+          "min": 20
+        }
+      ]
+    ],
+    "effects": [
+      {
+        "type": "classFixedAbility",
+        "level": 20
+      }
+    ],
+    "repeatable": false
+  },
+  {
+    "id": "especializacao-em-arma",
+    "name": "Especialização em Arma",
+    "category": "classe",
+    "source": "guerreiro",
+    "powerType": "poder-de-guerreiro",
+    "summary": "Poder de guerreiro ligado ao uso superior de uma arma escolhida.",
+    "requirements": [],
+    "effects": [
+      {
+        "type": "weaponSpecialization",
+        "requiresChosenWeapon": true
+      }
+    ],
+    "repeatable": false
+  },
+  {
+    "id": "mestre-em-arma",
+    "name": "Mestre em Arma",
+    "category": "classe",
+    "source": "guerreiro",
+    "powerType": "poder-de-guerreiro",
+    "summary": "Aprimora o uso de uma arma escolhida e permite nova rolagem em ataque mediante custo de PM.",
+    "requirements": [
+      [
+        {
+          "type": "power",
+          "powerId": "especializacao-em-arma"
+        },
+        {
+          "type": "classLevel",
+          "classId": "guerreiro",
+          "min": 12
+        }
+      ]
+    ],
+    "effects": [
+      {
+        "type": "increaseWeaponDamageStep",
+        "value": 1,
+        "requiresSameChosenWeaponAs": "especializacao-em-arma"
+      },
+      {
+        "type": "rerollAttackTest",
+        "costPM": 2
+      }
+    ],
+    "repeatable": false,
+    "auditNote": "Na fase 1, este poder foi incluído como caso-teste porque costuma revelar erro de nível mínimo."
+  }
+]

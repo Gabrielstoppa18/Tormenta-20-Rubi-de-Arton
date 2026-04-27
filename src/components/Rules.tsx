@@ -32,30 +32,30 @@ const Rules = () => {
   ];
 
   return (
-    <div className="p-8 space-y-8 max-w-4xl mx-auto">
+    <div className="p-4 md:p-8 space-y-6 md:space-y-8 max-w-4xl mx-auto">
       <div className="text-center space-y-2">
-        <h2 className="font-cinzel text-3xl font-bold text-gothic-gold tracking-widest uppercase">Guia de Criação</h2>
-        <p className="text-gothic-text/60 italic text-sm">Siga os passos ancestrais para forjar sua lenda</p>
+        <h2 className="font-cinzel text-2xl md:text-3xl font-bold text-gothic-gold tracking-widest uppercase">Guia de Criação</h2>
+        <p className="text-gothic-text/60 italic text-xs md:text-sm">Siga os passos ancestrais para forjar sua lenda</p>
       </div>
 
-      <div className="grid gap-6">
+      <div className="grid gap-4 md:gap-6">
         {sections.map((section, index) => (
           <motion.div
             key={index}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="bg-gothic-card/50 border border-gothic-gold/10 p-6 rounded-sm hover:border-gothic-gold/30 transition-all group"
+            className="bg-gothic-card/50 border border-gothic-gold/10 p-4 md:p-6 rounded-sm hover:border-gothic-gold/30 transition-all group"
           >
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-gothic-gold/5 rounded-sm group-hover:bg-gothic-gold/10 transition-colors">
-                {section.icon}
+            <div className="flex items-start gap-3 md:gap-4">
+              <div className="p-2 md:p-3 bg-gothic-gold/5 rounded-sm group-hover:bg-gothic-gold/10 transition-colors shrink-0">
+                {React.cloneElement(section.icon as React.ReactElement, { size: 18 })}
               </div>
-              <div className="space-y-2">
-                <h3 className="font-cinzel text-lg font-bold text-gothic-gold/80 uppercase tracking-wider">
+              <div className="space-y-1 md:space-y-2">
+                <h3 className="font-cinzel text-base md:text-lg font-bold text-gothic-gold/80 uppercase tracking-wider">
                   {section.title}
                 </h3>
-                <p className="text-gothic-text/70 text-sm leading-relaxed">
+                <p className="text-gothic-text/70 text-xs md:text-sm leading-relaxed">
                   {section.content}
                 </p>
               </div>

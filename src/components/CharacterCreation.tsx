@@ -60,14 +60,14 @@ class CustomOrigin extends T20Origin {
   readonly name: any;
   readonly equipments: any[] = [];
 
-  constructor(name: string) {
-    // Provide 2 dummy benefits to satisfy Origin validation (requires exactly 2)
-    const benefit1 = new OriginBenefitSkill(SkillName.athletics);
-    const benefit2 = new OriginBenefitSkill(SkillName.will);
+  constructor(name: string, skills: SkillName[] = [SkillName.athletics, SkillName.will]) {
+    // Provide 2 benefits to satisfy Origin validation (requires exactly 2)
+    const benefit1 = new OriginBenefitSkill(skills[0]);
+    const benefit2 = new OriginBenefitSkill(skills[1] || skills[0]);
     
     // Provide the corresponding skills in the benefits list to satisfy benefit validation
     super([benefit1, benefit2], { 
-      skills: [SkillName.athletics, SkillName.will], 
+      skills: skills, 
       generalPowers: [], 
       originPower: undefined 
     } as any);
@@ -87,21 +87,38 @@ interface CharacterCreationProps {
 
 // --- Constants ---
 
-const DEFAULT_CLASS_SKILLS: Record<string, string[][]> = {
-  arcanist: [['knowledge', 'diplomacy']],
-  warrior: [['fight'], ['animalHandling', 'athletics']],
-  barbarian: [['animalHandling', 'athletics', 'animalRide', 'initiative']],
-  buccaneer: [['fight'], ['acrobatics', 'athletics', 'acting', 'cheat']],
-  bard: [['acrobatics', 'animalRide', 'knowledge', 'diplomacy', 'cheat', 'stealth']],
-  ranger: [['fight'], ['animalHandling', 'athletics', 'animalRide', 'cure', 'fortitude', 'stealth']],
-  knight: [['animalHandling', 'athletics']],
-  cleric: [['knowledge', 'cure']],
-  druid: [['animalHandling', 'athletics', 'animalRide', 'knowledge']],
-  inventor: [['knowledge', 'cure', 'diplomacy', 'fortitude']],
-  rogue: [['acrobatics', 'athletics', 'acting', 'animalRide', 'knowledge', 'diplomacy', 'cheat', 'stealth']],
-  fighter: [['acrobatics', 'animalHandling', 'athletics', 'cheat']],
-  noble: [['diplomacy', 'intimidation'], ['animalHandling', 'acting', 'animalRide', 'knowledge']],
-  paladin: [['animalHandling', 'athletics']],
+const DEFAULT_CLASS_SKILLS: Record<string, SkillName[][]> = {
+  arcanist: [[SkillName.knowledge, SkillName.diplomacy]],
+  warrior: [[SkillName.fight], [SkillName.animalHandling, SkillName.athletics]],
+  barbarian: [[SkillName.animalHandling, SkillName.athletics, SkillName.animalRide, SkillName.initiative]],
+  buccaneer: [[SkillName.fight], [SkillName.acrobatics, SkillName.athletics, SkillName.acting, SkillName.cheat]],
+  bard: [[SkillName.acrobatics, SkillName.animalRide, SkillName.knowledge, SkillName.diplomacy, SkillName.cheat, SkillName.stealth]],
+  ranger: [[SkillName.fight], [SkillName.animalHandling, SkillName.athletics, SkillName.animalRide, SkillName.cure, SkillName.fortitude, SkillName.stealth]],
+  knight: [[SkillName.animalHandling, SkillName.athletics]],
+  cleric: [[SkillName.knowledge, SkillName.cure]],
+  druid: [[SkillName.animalHandling, SkillName.athletics, SkillName.animalRide, SkillName.knowledge]],
+  inventor: [[SkillName.knowledge, SkillName.cure, SkillName.diplomacy, SkillName.fortitude]],
+  rogue: [[SkillName.acrobatics, SkillName.athletics, SkillName.acting, SkillName.animalRide, SkillName.knowledge, SkillName.diplomacy, SkillName.cheat, SkillName.stealth]],
+  fighter: [[SkillName.acrobatics, SkillName.animalHandling, SkillName.athletics, SkillName.cheat]],
+  noble: [[SkillName.diplomacy, SkillName.intimidation], [SkillName.animalHandling, SkillName.acting, SkillName.animalRide, SkillName.knowledge]],
+  paladin: [[SkillName.animalHandling, SkillName.athletics]],
+};
+
+const CLASS_MANDATORY_SKILLS: Record<string, SkillName[]> = {
+  arcanist: [SkillName.will, SkillName.mysticism],
+  warrior: [SkillName.fight, SkillName.fortitude],
+  barbarian: [SkillName.fight, SkillName.fortitude],
+  buccaneer: [SkillName.reflexes, SkillName.initiative],
+  bard: [SkillName.reflexes, SkillName.will],
+  ranger: [SkillName.survival, SkillName.aim],
+  knight: [SkillName.fortitude, SkillName.will],
+  cleric: [SkillName.religion, SkillName.will],
+  druid: [SkillName.survival, SkillName.will],
+  inventor: [SkillName.craft, SkillName.will],
+  rogue: [SkillName.reflexes, SkillName.thievery],
+  fighter: [SkillName.fight, SkillName.fortitude],
+  noble: [SkillName.will, SkillName.diplomacy],
+  paladin: [SkillName.will, SkillName.fight],
 };
 
 const DEFAULT_ORIGIN_BENEFITS: Record<string, string[]> = {
@@ -191,6 +208,33 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
 
     try {
       const builder = new SheetBuilder();
+      const trainedSkills = new Set<SkillName>();
+
+      // Helper to pick skills that aren't already trained
+      const getSafeChoices = (choices: SkillName[], count: number): SkillName[] => {
+        const result: SkillName[] = [];
+        for (const s of choices) {
+          if (!trainedSkills.has(s)) {
+            result.push(s);
+            trainedSkills.add(s);
+            if (result.length === count) return result;
+          }
+        }
+        // Fallback to any skill not trained
+        const allSkills = Object.values(SkillName);
+        for (const s of allSkills) {
+          if (!trainedSkills.has(s)) {
+            result.push(s);
+            trainedSkills.add(s);
+            if (result.length === count) return result;
+          }
+        }
+        return result;
+      };
+
+      // Add class mandatory skills to trained set early to avoid race/origin conflicts
+      const classMandatory = CLASS_MANDATORY_SKILLS[formData.class_id] || [];
+      classMandatory.forEach(s => trainedSkills.add(s));
       
       // 1. Attributes
       console.log('2. Setting attributes:', formData.attributes_base);
@@ -202,33 +246,25 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
         wisdom: formData.attributes_base.sab,
         charisma: formData.attributes_base.car
       });
-      
+
       // 2. Race
       console.log('3. Adding race:', formData.race_id);
-      let race: any;
-      const supportedRaces = ['human', 'dwarf', 'dahllan', 'elf', 'goblin', 'lefeu', 'minotaur', 'qareen'];
+      let race;
+      const supportedRaces = [RaceName.human, RaceName.dwarf, RaceName.elf, RaceName.dahllan, RaceName.goblin, RaceName.qareen, RaceName.minotaur];
       
-      if (formData.race_id === 'human') {
-        race = (RaceFactory as any).makeHuman({
-          name: 'human' as any,
-          selectedAttributes: ['strength', 'dexterity'],
-          versatileChoices: [{ type: 'skill', name: 'athletics' }]
-        } as any);
-      } else if (formData.race_id === 'qareen') {
-        race = (RaceFactory as any).makeQareen({
-          name: 'qareen' as any,
-          qareenType: 'light',
-          mysticTattooSpell: 'arcaneArmor'
-        } as any);
-      } else if (formData.race_id === 'lefeu') {
-        race = (RaceFactory as any).makeLefeu({
-          name: 'lefeu' as any,
+      if (formData.race_id === RaceName.human) {
+        const raceSkills = getSafeChoices([SkillName.perception, SkillName.initiative, SkillName.stealth, SkillName.athletics], 2);
+        race = RaceFactory.makeFromSerialized({ 
+          name: RaceName.human, 
           selectedAttributes: ['strength', 'dexterity', 'constitution'],
-          deformityChoices: [{ name: 'claws' }],
-          previousRace: 'human'
+          chosenSkills: raceSkills
         } as any);
-      } else if (supportedRaces.includes(formData.race_id)) {
+      } else if (supportedRaces.includes(formData.race_id as any)) {
         race = RaceFactory.makeFromSerialized({ name: formData.race_id as any } as any);
+        // Add mandatory race skills to trained set (approximate)
+        if (formData.race_id === 'hynne') trainedSkills.add(SkillName.stealth);
+        if (formData.race_id === RaceName.dahllan) trainedSkills.add(SkillName.survival);
+        if (formData.race_id === RaceName.goblin) trainedSkills.add(SkillName.stealth);
       } else {
         const raceData = (RACES as any)[formData.race_id];
         const modifiers: any = {};
@@ -247,26 +283,39 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
       // 3. Class
       console.log('4. Adding class:', formData.class_id);
       let role;
+      
+      // Filter default skills to avoid duplicates
+      const rawDefaultSkills = DEFAULT_CLASS_SKILLS[formData.class_id] || [[]];
+      const filteredDefaultSkills = rawDefaultSkills.map(group => {
+        const safe = group.filter(s => !trainedSkills.has(s));
+        if (safe.length === 0) {
+          // If all skills in group are trained, pick a random safe one
+          return getSafeChoices([], 1);
+        }
+        safe.forEach(s => trainedSkills.add(s));
+        return safe;
+      });
+
       if (formData.class_id === RoleName.arcanist) {
         role = ArcanistFactory.makeFromSerialized({ 
           name: RoleName.arcanist, 
-          selectedSkillsByGroup: DEFAULT_CLASS_SKILLS.arcanist || [[]],
+          selectedSkillsByGroup: filteredDefaultSkills,
           path: { 
             name: ArcanistPathName.wizard, 
             focus: EquipmentName.staff 
           },
           initialSpells: [SpellName.arcaneArmor, SpellName.mentalDagger, SpellName.illusoryDisguise]
         } as any);
-      } else if (formData.class_id === RoleName.warrior) {
-        role = RoleFactory.makeFromSerialized({ 
-          name: RoleName.warrior, 
-          selectedSkillsByGroup: DEFAULT_CLASS_SKILLS.warrior || [[]],
-        } as any);
       } else {
         const RoleClass = (Roles as any).get(formData.class_id);
         if (RoleClass) {
-          const defaultSkills = DEFAULT_CLASS_SKILLS[formData.class_id] || [[]];
-          role = new RoleClass(defaultSkills);
+          role = new RoleClass(filteredDefaultSkills);
+        } else {
+          // Fallback for Warrior or others if not in Roles map
+          role = RoleFactory.makeFromSerialized({ 
+            name: formData.class_id as any, 
+            selectedSkillsByGroup: filteredDefaultSkills,
+          } as any);
         }
       }
       
@@ -284,25 +333,21 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
       const mappedName = originIdMap[formData.origin_id];
       
       let origin: any;
-      if (mappedName === OriginName.acolyte) {
-        origin = OriginFactory.makeFromSerialized({ 
-          name: OriginName.acolyte, 
-          chosenBenefits: [
-            { name: SkillName.religion },
-            { name: SkillName.will }
-          ]
-        } as any);
-      } else if (mappedName === OriginName.animalsFriend) {
-        origin = OriginFactory.makeFromSerialized({ 
-          name: OriginName.animalsFriend, 
-          chosenBenefits: [
-            { name: SkillName.animalHandling },
-            { name: SkillName.animalRide }
-          ],
-          chosenAnimal: 'dog'
-        } as any);
-      } else {
-        origin = new CustomOrigin(formData.origin_id);
+      try {
+        if (mappedName) {
+          const originSkills = getSafeChoices([SkillName.athletics, SkillName.will], 2);
+          origin = OriginFactory.makeFromSerialized({ 
+            name: mappedName, 
+            chosenBenefits: originSkills.map(s => ({ name: s }))
+          } as any);
+        } else {
+          const originSkills = getSafeChoices([SkillName.athletics, SkillName.will], 2);
+          origin = new CustomOrigin(formData.origin_id, originSkills);
+        }
+      } catch (originErr) {
+        console.warn('Error creating standard origin, falling back to custom:', originErr);
+        const originSkills = getSafeChoices([SkillName.athletics, SkillName.will], 2);
+        origin = new CustomOrigin(formData.origin_id, originSkills);
       }
       builder.chooseOrigin(origin);
 
@@ -334,7 +379,8 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
         current_mp: maxMP,
         notes: `CHAR_DATA_JSON:${JSON.stringify({
           inventory: [],
-          deity: 'None'
+          deity: '',
+          spells: formData.class_id === 'arcanist' ? ['armadura_arcana', 'seta_infalível_de_talude', 'disfarce_ilusório'] : []
         })}`
       });
       console.log('9. Character created with ID:', character.id);
@@ -418,17 +464,17 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
 
   return (
     <div className="fixed inset-0 bg-gothic-bg z-50 overflow-y-auto gothic-scroll">
-      <div className="max-w-4xl mx-auto p-8 py-16">
-        <header className="text-center mb-16 relative">
+      <div className="max-w-4xl mx-auto p-4 md:p-8 py-8 md:py-16">
+        <header className="text-center mb-8 md:mb-16 relative">
           <button 
             onClick={onCancel}
-            className="absolute left-0 top-0 text-gothic-gold/40 hover:text-gothic-gold transition-colors font-cinzel text-xs flex items-center gap-1"
+            className="md:absolute left-0 top-0 text-gothic-gold/40 hover:text-gothic-gold transition-colors font-cinzel text-[10px] md:text-xs flex items-center gap-1 mb-4 md:mb-0"
           >
             <ChevronLeft size={14} /> CANCELAR
           </button>
-          <h1 className="font-cinzel text-4xl font-bold text-gothic-gold mb-2 tracking-tighter">Criação de Personagem</h1>
-          <div className="h-1 w-32 bg-gothic-red mx-auto" />
-          <p className="text-gothic-text/40 text-xs uppercase tracking-[0.3em] mt-4">Passo {step} de 4</p>
+          <h1 className="font-cinzel text-2xl md:text-4xl font-bold text-gothic-gold mb-2 tracking-tighter">Criação de Personagem</h1>
+          <div className="h-1 w-24 md:w-32 bg-gothic-red mx-auto" />
+          <p className="text-gothic-text/40 text-[8px] md:text-[10px] uppercase tracking-[0.3em] mt-4">Passo {step} de 4</p>
         </header>
 
         <AnimatePresence mode="wait">
@@ -440,31 +486,31 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
               exit={{ opacity: 0, x: -20 }}
               className="space-y-8"
             >
-              <div className="bg-gothic-card p-8 border border-gothic-gold/20">
-                <label className="block font-cinzel text-sm text-gothic-gold mb-4 uppercase tracking-widest">Como você será conhecido em Arthon?</label>
+              <div className="bg-gothic-card p-4 md:p-8 border border-gothic-gold/20">
+                <label className="block font-cinzel text-xs md:text-sm text-gothic-gold mb-4 uppercase tracking-widest">Como você será conhecido em Arthon?</label>
                 <input 
                   type="text"
                   placeholder="Ex: Sir Alistair, o Audaz"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-black/40 border border-gothic-gold/20 p-4 font-cinzel text-xl text-gothic-text focus:border-gothic-gold outline-none transition-colors"
+                  className="w-full bg-black/40 border border-gothic-gold/20 p-3 md:p-4 font-cinzel text-lg md:text-xl text-gothic-text focus:border-gothic-gold outline-none transition-colors"
                 />
               </div>
 
-              <div className="bg-gothic-card p-8 border border-gothic-gold/20">
-                <div className="flex justify-between items-center mb-6">
-                  <label className="block font-cinzel text-sm text-gothic-gold uppercase tracking-widest">Distribua seus Atributos</label>
-                  <div className="px-3 py-1 bg-gothic-gold/10 border border-gothic-gold/20">
+              <div className="bg-gothic-card p-4 md:p-8 border border-gothic-gold/20">
+                <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+                  <label className="block font-cinzel text-xs md:text-sm text-gothic-gold uppercase tracking-widest">Distribua seus Atributos</label>
+                  <div className="px-3 py-1 bg-gothic-gold/10 border border-gothic-gold/20 self-start">
                     <span className="text-[10px] text-gothic-gold font-bold uppercase tracking-widest">Pontos: {remainingPoints}</span>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 md:gap-8">
                   {(Object.keys(formData.attributes_base) as Array<keyof typeof formData.attributes_base>).map(attr => (
                     <div key={attr} className="flex flex-col items-center gap-2">
                       <span className="text-[10px] font-bold text-gothic-gold uppercase tracking-widest">
                         {Translator.getAttributeTranslation(attrMapping[attr]).substring(0, 3)}
                       </span>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 md:gap-4">
                         <button 
                           disabled={formData.attributes_base[attr] <= -1}
                           onClick={() => setFormData(f => ({ ...f, attributes_base: { ...f.attributes_base, [attr]: f.attributes_base[attr] - 1 } }))}
@@ -472,7 +518,7 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
                         >
                           <Minus size={14} />
                         </button>
-                        <span className="font-cinzel text-2xl font-bold text-gothic-text w-8 text-center">{formData.attributes_base[attr]}</span>
+                        <span className="font-cinzel text-xl md:text-2xl font-bold text-gothic-text w-6 md:w-8 text-center">{formData.attributes_base[attr]}</span>
                         <button 
                           disabled={formData.attributes_base[attr] >= 4 || remainingPoints < (getAttributeCost(formData.attributes_base[attr] + 1) - getAttributeCost(formData.attributes_base[attr]))}
                           onClick={() => setFormData(f => ({ ...f, attributes_base: { ...f.attributes_base, [attr]: f.attributes_base[attr] + 1 } }))}
@@ -519,8 +565,8 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
                         : "bg-gothic-card border-gothic-gold/10 hover:border-gothic-gold/40"
                     )}
                   >
-                    <h3 className="font-cinzel text-xl font-bold text-gothic-gold mb-2">{race.name}</h3>
-                    <p className="text-xs text-gothic-text/80 mb-4 leading-relaxed">{race.description}</p>
+                    <h3 className="font-cinzel text-lg md:text-xl font-bold text-gothic-gold mb-2">{race.name}</h3>
+                    <p className="text-[10px] md:text-xs text-gothic-text/80 mb-4 leading-relaxed">{race.description}</p>
                     {race.abilities && (
                       <div className="mt-auto pt-4 border-t border-gothic-gold/10">
                         <p className="text-[10px] uppercase tracking-widest text-gothic-gold/60 mb-2">Habilidades:</p>
@@ -570,10 +616,10 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
                     )}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-cinzel text-xl font-bold text-gothic-gold">{cls.name}</h3>
-                      <div className="flex gap-2">
-                        <span className="text-[9px] px-1.5 py-0.5 bg-gothic-red/10 text-gothic-red border border-gothic-red/20">{cls.hp_initial} PV</span>
-                        <span className="text-[9px] px-1.5 py-0.5 bg-gothic-blue/10 text-gothic-blue border border-gothic-blue/20">{cls.mana_per_level} PM</span>
+                      <h3 className="font-cinzel text-lg md:text-xl font-bold text-gothic-gold">{cls.name}</h3>
+                      <div className="flex gap-1 md:gap-2">
+                        <span className="text-[8px] md:text-[9px] px-1.5 py-0.5 bg-gothic-red/10 text-gothic-red border border-gothic-red/20">{cls.hp_initial} PV</span>
+                        <span className="text-[8px] md:text-[9px] px-1.5 py-0.5 bg-gothic-blue/10 text-gothic-blue border border-gothic-blue/20">{cls.mana_per_level} PM</span>
                       </div>
                     </div>
                     <p className="text-xs text-gothic-text/60 line-clamp-3 leading-relaxed">{cls.description}</p>
@@ -613,15 +659,20 @@ export function CharacterCreation({ onComplete, onCancel, userId }: CharacterCre
                         : "bg-gothic-card border-gothic-gold/10 hover:border-gothic-gold/40"
                     )}
                   >
-                    <h3 className="font-cinzel text-xl font-bold text-gothic-gold mb-2">{origin.name}</h3>
-                    <p className="text-xs text-gothic-text/60 mb-4 leading-relaxed">{origin.description}</p>
+                    <h3 className="font-cinzel text-lg md:text-xl font-bold text-gothic-gold mb-2">{origin.name}</h3>
+                    <p className="text-[10px] md:text-xs text-gothic-text/60 mb-4 leading-relaxed">{origin.description}</p>
                     <div className="flex flex-wrap gap-1.5">
-                      {(origin as any).benefits?.split(',').map((benefit: string, idx: number) => (
+                      {(typeof (origin as any).benefits === 'string' 
+                        ? (origin as any).benefits.split(',') 
+                        : Array.isArray((origin as any).benefits) 
+                          ? (origin as any).benefits 
+                          : []
+                      ).map((benefit: string, idx: number) => (
                         <span 
                           key={idx}
                           className="text-[9px] px-2 py-0.5 bg-gothic-gold/5 text-gothic-gold/80 border border-gothic-gold/10 rounded-sm uppercase tracking-wider"
                         >
-                          {benefit.trim()}
+                          {typeof benefit === 'string' ? benefit.trim() : String(benefit)}
                         </span>
                       ))}
                     </div>

@@ -42,7 +42,7 @@ export function PowersList({ onAddPower }: PowersListProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row gap-4 bg-gothic-card p-4 border border-gothic-gold/10">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gothic-gold/40" size={18} />
@@ -60,7 +60,7 @@ export function PowersList({ onAddPower }: PowersListProps) {
               key={type}
               onClick={() => setActiveFilter(activeFilter === type ? null : type)}
               className={cn(
-                "px-4 py-2 font-cinzel text-[10px] font-bold tracking-widest uppercase border transition-all whitespace-nowrap",
+                "px-3 md:px-4 py-2 font-cinzel text-[9px] md:text-[10px] font-bold tracking-widest uppercase border transition-all whitespace-nowrap",
                 activeFilter === type 
                   ? "bg-gothic-gold text-gothic-bg border-gothic-gold" 
                   : "bg-gothic-card text-gothic-gold/60 border-gothic-gold/20 hover:border-gothic-gold/40"
@@ -72,13 +72,13 @@ export function PowersList({ onAddPower }: PowersListProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {filteredPowers.map(power => (
-          <div key={power.id} className="bg-gothic-card p-6 border border-gothic-gold/10 hover:border-gothic-gold/30 transition-all group relative">
+          <div key={power.id} className="bg-gothic-card p-4 md:p-6 border border-gothic-gold/10 hover:border-gothic-gold/30 transition-all group relative">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-3">
-                <Trophy className="text-gothic-gold/40 group-hover:text-gothic-gold transition-colors" size={18} />
-                <h4 className="font-cinzel text-sm font-bold text-gothic-gold">{power.name}</h4>
+                <Trophy className="text-gothic-gold/40 group-hover:text-gothic-gold transition-colors" size={16} />
+                <h4 className="font-cinzel text-xs md:text-sm font-bold text-gothic-gold">{power.name}</h4>
               </div>
               {onAddPower && (
                 <button 
@@ -91,19 +91,19 @@ export function PowersList({ onAddPower }: PowersListProps) {
             </div>
             
             <div className="space-y-3">
-              <p className="text-xs text-gothic-text/60 leading-relaxed italic">
+              <p className="text-[10px] md:text-xs text-gothic-text/60 leading-relaxed italic">
                 {power.description}
               </p>
               
               {power.requirement_text && (
                 <div className="pt-3 border-t border-gothic-gold/5">
-                  <p className="text-[10px] font-bold text-gothic-red/60 uppercase tracking-widest mb-1">Pré-requisitos</p>
-                  <p className="text-[10px] text-gothic-text/40">{power.requirement_text}</p>
+                  <p className="text-[9px] md:text-[10px] font-bold text-gothic-red/60 uppercase tracking-widest mb-1">Pré-requisitos</p>
+                  <p className="text-[9px] md:text-[10px] text-gothic-text/40">{power.requirement_text}</p>
                 </div>
               )}
 
               <div className="flex justify-between items-center pt-2">
-                <span className="text-[9px] px-1.5 py-0.5 bg-gothic-gold/5 text-gothic-gold/40 border border-gothic-gold/10 uppercase tracking-tighter">
+                <span className="text-[8px] md:text-[9px] px-1.5 py-0.5 bg-gothic-gold/5 text-gothic-gold/40 border border-gothic-gold/10 uppercase tracking-tighter">
                   {power.power_type}
                 </span>
               </div>

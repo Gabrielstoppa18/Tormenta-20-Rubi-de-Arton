@@ -1,0 +1,68 @@
+[
+  {
+    "id": "guerreiro",
+    "name": "Guerreiro",
+    "mainAttributes": [
+      "forca",
+      "destreza"
+    ],
+    "initialPV": 20,
+    "pvPerLevel": 5,
+    "pmPerLevel": 3,
+    "mandatorySkills": [
+      {
+        "kind": "choice",
+        "choose": 1,
+        "options": [
+          "luta",
+          "pontaria"
+        ]
+      },
+      {
+        "kind": "fixed",
+        "skill": "fortitude"
+      }
+    ],
+    "optionalSkills": {
+      "choose": 2,
+      "options": [
+        "adestramento",
+        "atletismo",
+        "cavalgar",
+        "guerra",
+        "iniciativa",
+        "intimidacao",
+        "oficio",
+        "percepcao",
+        "reflexos"
+      ]
+    },
+    "proficiencies": [
+      "armas-simples",
+      "armas-marciais",
+      "armaduras-leves",
+      "armaduras-pesadas",
+      "escudos"
+    ],
+    "fixedAbilities": [
+      {
+        "level": 1,
+        "abilityId": "ataque-especial"
+      },
+      {
+        "level": 3,
+        "abilityId": "durao"
+      },
+      {
+        "level": 6,
+        "abilityId": "ataque-extra"
+      },
+      {
+        "level": 20,
+        "abilityId": "campeao"
+      }
+    ],
+    "classPowerType": "poder-de-guerreiro",
+    "auditStatus": "fase-1-auditado-parcialmente"
+  }
+]

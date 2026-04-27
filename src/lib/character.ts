@@ -122,8 +122,17 @@ export const characterService = {
     const path = `characters/${id}`;
     try {
       const docRef = doc(db, 'characters', id);
+      
+      // Sanitize updates to remove undefined values
+      const sanitizedUpdates = Object.entries(updates).reduce((acc, [key, value]) => {
+        if (value !== undefined) {
+          acc[key] = value;
+        }
+        return acc;
+      }, {} as any);
+
       const data = {
-        ...updates,
+        ...sanitizedUpdates,
         updated_at: serverTimestamp(),
       };
       await updateDoc(docRef, data);
