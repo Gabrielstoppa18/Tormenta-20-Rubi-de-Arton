@@ -1,4 +1,4 @@
-import { Requirement, RequirementGroup, AttributeName } from './types';
+import { Requirement, RequirementGroup, AttributeName, ValidatableCharacter } from './types';
 
 // Map Portuguese attribute names to internal keys
 const attributeMap: Record<string, AttributeName> = {
@@ -21,17 +21,6 @@ const attributeMap: Record<string, AttributeName> = {
   'charisma': 'car',
   'car': 'car'
 };
-
-export interface ValidatableCharacter {
-  level: number;
-  class_id?: string;
-  race_id?: string;
-  deity?: string;
-  attributes: Record<string, number>;
-  powers: string[]; // names or IDs
-  trainedSkills: string[];
-  proficiencies?: string[];
-}
 
 export function meetsRequirement(character: ValidatableCharacter, req: Requirement): boolean {
   switch (req.type) {
