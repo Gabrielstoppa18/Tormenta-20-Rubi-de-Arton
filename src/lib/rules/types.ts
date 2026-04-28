@@ -59,18 +59,18 @@ export interface ClassRule {
   auditStatus?: string;
 }
 
+export interface BlockedPower {
+  power: PowerRule;
+  reason: string;
+}
+
 export interface ValidatableCharacter {
   level: number;
   class_id?: string;
   race_id?: string;
   deity?: string;
   attributes: Record<string, number>;
-  powers: string[]; // names or IDs
+  powers: string[];
   trainedSkills: string[];
   proficiencies?: string[];
-}
-
-export interface BlockedPower {
-  power: PowerRule;
-  reason: string;
 }

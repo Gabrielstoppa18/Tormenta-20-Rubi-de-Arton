@@ -1,4 +1,9 @@
-import { Requirement, RequirementGroup, AttributeName, ValidatableCharacter } from './types';
+import {
+  Requirement,
+  RequirementGroup,
+  AttributeName,
+  ValidatableCharacter,
+} from './types';
 
 // Map Portuguese attribute names to internal keys
 const attributeMap: Record<string, AttributeName> = {
