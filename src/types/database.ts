@@ -89,6 +89,15 @@ export type Character = {
   current_hp?: number;
   current_mp?: number;
   group_id?: string;
+  // Proper persistence fields (replaces legacy notes/CHAR_DATA_JSON)
+  deity?: string;
+  trained_skills?: string[];
+  conditions?: string[];
+  defense_bonus?: number;
+  powers_data?: Record<string, any>[];
+  spells_data?: Record<string, any>[];
+  inventory_data?: Record<string, any>[];
+  /** @deprecated Use structured fields above instead */
   notes?: string;
   created_at: string;
   updated_at: string;

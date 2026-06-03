@@ -96,10 +96,22 @@ export const compendiumService = {
   },
 
   async getClasses(): Promise<Class[]> {
+    // PT → EN normalisation used in both Firestore reads and fallback
+    const PT_EN_IDS: Record<string, string> = {
+      arcanista: 'arcanist', guerreiro: 'warrior', bárbaro: 'barbarian', barbaro: 'barbarian',
+      bardo: 'bard', bucaneiro: 'buccaneer', caçador: 'ranger', cacador: 'ranger',
+      cavaleiro: 'knight', clérigo: 'cleric', clerigo: 'cleric', druida: 'druid',
+      inventor: 'inventor', ladino: 'rogue', lutador: 'fighter', nobre: 'noble', paladino: 'paladin',
+    };
+    const normalizeId = (id: string) => PT_EN_IDS[id.toLowerCase()] ?? id.toLowerCase();
+
     try {
       const querySnapshot = await getDocs(collection(db, 'classes'));
       if (!querySnapshot.empty) {
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class));
+        return querySnapshot.docs.map(doc => ({
+          id: normalizeId(doc.id),
+          ...doc.data()
+        } as Class));
       }
 
       const roles = Roles.getAll();
@@ -121,14 +133,15 @@ export const compendiumService = {
         };
       });
 
-      // Merge with JSON rules
+      // Merge with JSON rules — keep the English id as canonical
       const mergedClasses = [...baseClasses];
       classesRules.forEach(rule => {
-        const index = mergedClasses.findIndex(c => c.id.toLowerCase() === rule.id.toLowerCase());
+        const canonicalId = normalizeId(rule.id);
+        const index = mergedClasses.findIndex(c => c.id.toLowerCase() === canonicalId);
         const mappedClass = {
-          id: rule.id,
+          id: canonicalId,  // always use the EN canonical id
           name: rule.name,
-          description: `Regras carregadas de ${rule.id}.rules.json. PV: ${rule.initialPV}/${rule.pvPerLevel}. PM: ${rule.pmPerLevel}.`,
+          description: `PV: ${rule.initialPV}/${rule.pvPerLevel} | PM/nível: ${rule.pmPerLevel}`,
           hp_initial: rule.initialPV,
           hp_per_level: rule.pvPerLevel,
           mana_per_level: rule.pmPerLevel,

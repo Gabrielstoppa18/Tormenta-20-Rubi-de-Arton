@@ -1,14 +1,13 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy,
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
   serverTimestamp,
   Timestamp
 } from 'firebase/firestore';
@@ -70,16 +69,23 @@ export const characterService = {
   async getCharacters(userId: string): Promise<Character[]> {
     const path = 'characters';
     try {
+      // Simple where query — no orderBy to avoid requiring a composite Firestore index.
+      // Sort client-side instead.
       const q = query(
         collection(db, path),
         where('user_id', '==', userId),
-        orderBy('updated_at', 'desc')
       );
       const querySnapshot = await getDocs(q);
-      return querySnapshot.docs.map(doc => ({
+      const chars = querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Character[];
+
+      return chars.sort((a, b) => {
+        const aTime = (a.updated_at as any)?.seconds ?? 0;
+        const bTime = (b.updated_at as any)?.seconds ?? 0;
+        return bTime - aTime;
+      });
     } catch (error) {
       handleFirestoreError(error, OperationType.LIST, path);
       return [];
